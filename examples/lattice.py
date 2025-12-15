@@ -132,6 +132,58 @@ def _matrix_from_candidate(candidate: Iterable[Iterable[float]]) -> Matrix:
     return matrix
 
 
+
+def _compute_gram_schmidt(basis: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return Gram–Schmidt orthogonalization and coefficients.
+
+    Returns (B, mu, norm_sq) where B is the orthogonalized basis, mu contains the
+    projection coefficients, and norm_sq stores squared norms of the rows in B.
+    """
+    n = basis.shape[0]
+    ortho = np.zeros_like(basis)
+    mu = np.zeros((n, n), dtype=float)
+    norm_sq = np.zeros(n, dtype=float)
+
+    for i in range(n):
+        ortho[i] = basis[i]
+        for j in range(i):
+            if norm_sq[j] <= 0.0:
+                continue
+            mu[i, j] = np.dot(basis[i], ortho[j]) / norm_sq[j]
+            ortho[i] -= mu[i, j] * ortho[j]
+        norm_sq[i] = np.dot(ortho[i], ortho[i])
+    return ortho, mu, norm_sq
+
+
+def _lll_reduce(basis: np.ndarray, delta: float = DELTA) -> np.ndarray:
+    """Perform a lightweight LLL reduction for a square basis matrix."""
+    reduced = np.array(basis, dtype=float, copy=True)
+    n = reduced.shape[0]
+    ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+
+    def refresh(k: int) -> None:
+        nonlocal ortho, mu, norm_sq
+        ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+
+    k = 1
+    while k < n:
+        # Size reduction step
+        for j in range(k - 1, -1, -1):
+            if abs(mu[k, j]) > 0.5:
+                reduced[k] -= np.round(mu[k, j]) * reduced[j]
+                refresh(k)
+
+        # Lovász condition
+        if norm_sq[k] < (delta - mu[k, k - 1] ** 2) * norm_sq[k - 1]:
+            reduced[[k, k - 1]] = reduced[[k - 1, k]]
+            refresh(k)
+            k = max(k - 1, 1)
+        else:
+            k += 1
+
+    return reduced
+
+
 @funsearch.run
 def evaluate(program) -> float:
     """Judge function for FunSearch lattice experiments."""
@@ -163,6 +215,7 @@ def evaluate(program) -> float:
         scores.append(-math.log(shortest))
 
     return float(sum(scores) / len(scores))
+
 
 
 @funsearch.evolve
