@@ -110,34 +110,34 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
 
   # Extend log_path with sanitized inputs and model name
   log_path = pathlib.Path(output_path) / f"{problem_name}_{model_name}_n={sanitized_inputs}_{timestamp}"
-# Use llm backends for:
-# - OpenAI-style names starting with "gpt"
-# - Ollama-style names containing ":" like "qwen3-coder:30b"
-if model_name.startswith('gpt') or (':' in model_name):
-  model_type = 'gpt'
+  # Use llm backends for:
+  # - OpenAI-style names starting with "gpt"
+  # - Ollama-style names containing ":" like "qwen3-coder:30b"
+  if model_name.startswith('gpt') or (':' in model_name):
+    model_type = 'gpt'
 
-  # Prevent llm from loading other plugins that may crash (e.g. llm-gpt4all)
-  # Only do this automatically for Ollama model names.
-  if ':' in model_name:
-    os.environ.setdefault('LLM_LOAD_PLUGINS', 'llm-ollama')
+    # Prevent llm from loading other plugins that may crash (e.g. llm-gpt4all)
+    # Only do this automatically for Ollama model names.
+    if ':' in model_name:
+      os.environ.setdefault('LLM_LOAD_PLUGINS', 'llm-ollama')
 
-  model = llm.get_model(model_name)
+    model = llm.get_model(model_name)
 
-  # Some llm backends need a key; Ollama does not.
-  if hasattr(model, 'get_key') and hasattr(model, 'key'):
-    try:
-      model.key = model.get_key()
-    except Exception:
-      pass
-else:
-  model_type = 'llama'
-  model = Llama(
-      model_path=f"{model_name}.gguf",
-      verbose=False,
-      n_ctx=1024,
-      n_threads=32,
-      n_gpu_layers=25
-    )
+    # Some llm backends need a key; Ollama does not.
+    if hasattr(model, 'get_key') and hasattr(model, 'key'):
+      try:
+        model.key = model.get_key()
+      except Exception:
+        pass
+  else:
+    model_type = 'llama'
+    model = Llama(
+        model_path=f"{model_name}.gguf",
+        verbose=False,
+        n_ctx=1024,
+        n_threads=32,
+        n_gpu_layers=25
+      )
 
   
   lm = sampler.LLM(2, model, log_path, model_type)
