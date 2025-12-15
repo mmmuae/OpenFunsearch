@@ -87,28 +87,19 @@ class ExternalProcessSandbox(DummySandbox):
     """
     prog_path = call_data_path / "prog.pickle"
     output_file = call_data_path / "output.pickle"
+    cmd = (f"timeout {self.timeout_secs} {self.python_path} {CONTAINER_MAIN} {prog_path} {input_path} {output_file} 2> {error_file_path}")
+    # cmd = (f"timeout {self.timeout_secs} {self.python_path} {CONTAINER_MAIN} {prog_path} {input_path} {output_file}"
+    #        f" 2> {error_file_path}")
+    # print("Executing command:", cmd)
+    # result = os.system(cmd)
+    # exit_code = result >> 8
+    # signal_number = result & 0xFF
 
-    cmd = [
-        self.python_path,
-        str(CONTAINER_MAIN),
-        str(prog_path),
-        str(input_path),
-        str(output_file),
-    ]
-
-    try:
-      with open(error_file_path, "w") as stderr_file:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=stderr_file,
-            timeout=self.timeout_secs,
-        )
-      return result.returncode
-    except subprocess.TimeoutExpired:
-      with open(error_file_path, "a") as stderr_file:
-        stderr_file.write(f"Execution timed out after {self.timeout_secs} seconds.\n")
-      return -1
+    # print("Command result:", result)
+    # print("Exit code:", exit_code)
+    # print("Signal number:", signal_number)
+    # return exit_code
+    return os.system(cmd)
 
   def run(
           self,
