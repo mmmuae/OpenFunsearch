@@ -67,62 +67,69 @@ class LLM:
     self.model_type = model_type
 
   def _draw_sample(self, prompt: str) -> str:
-
-    if self.model_type=='gpt':
-      response = self.model.prompt(prompt)
+  
+    # Get a raw completion string from the configured backend.
+    if self.model_type in ('llm', 'gpt'):
+      resp = self.model.prompt(prompt)
+      text_attr = getattr(resp, "text", None)
+      if callable(text_attr):
+        output_text = text_attr()
+      elif isinstance(text_attr, str):
+        output_text = text_attr
+      else:
+        output_text = str(resp)
     else:
       output = self.model(
-          "<s>[INST] " + prompt + " [/INST]", 
+          "<s>[INST] " + prompt + " [/INST]",
           max_tokens=4096,
           stop=["</s>"],
           echo=True
       )
-
       output_text = output['choices'][0]['text']
-
-      #Saves full response and prompt for debugging purposes
-      with open('last_full_responses.txt', 'a') as file_eval:  
-        file_eval.write(f"PRE POSTPROCESSING RESPONSE {self.prompt_count}\n{output_text}\n")
-        file_eval.flush()  
-        
-      with open('last_prompts.txt', 'a') as file_eval:  
-        file_eval.write(f"Prompt {self.prompt_count}\n{prompt}\n")
-        file_eval.flush()  
-
-      #Code to try and find starting and ending point of the code, does not look clean, but catches most of the code 
-
-      code_start = output_text.find('```@funsearch.run\n') + 3  # Find the start of the code block
-      code_start_md = output_text.find('```\n')
-      code_end_md = output_text.find('```', code_start_md + 3)
-      code_start_py = output_text.find('```python\n')
-      code_end_py = output_text.find('```', code_start_py + 3)
-      code_start_def = output_text.find('def priority_v2')
-
-      #Actually extracts the code if it found a valid starting point
-      if code_start_py != -1 and code_end_py != -1:
-          response = output_text[code_start_py + len('```python\n'):code_end_py]
-      elif code_start_md != -1 and code_end_md != -1:
-          response = output_text[code_start_md + len('```\n'):code_end_md]
-      elif code_start != -1:
-          response = output_text[code_start:]
-      elif code_start_def != -1:
-          response = output_text[code_start_def:]
-      else:
-          response = output_text
-
-      #Saves after process response for debugging purposes
-      with open('last_processed_responses.txt', 'a') as file_eval:  
-        file_eval.write(f"AFTER POSTPROCESSING RESPONSE {self.prompt_count}\n{response}\n")
-        file_eval.flush()  
-
-      response = post_process(response)
-      response = autopep8.fix_code(response, options={
-        'indent_size': 2  #PVD: format to 2 spaces
-      })
-      with open('last_eval.txt', 'a') as file_eval:   #PVD: output for inspection what else may be required
-        file_eval.write(f"FINAL RESPONSE\n{response}\n")
-        file_eval.flush()  
-
+  
+    # Saves full response and prompt for debugging purposes
+    with open('last_full_responses.txt', 'a') as file_eval:
+      file_eval.write(f"PRE POSTPROCESSING RESPONSE {self.prompt_count}\n{output_text}\n")
+      file_eval.flush()
+  
+    with open('last_prompts.txt', 'a') as file_eval:
+      file_eval.write(f"Prompt {self.prompt_count}\n{prompt}\n")
+      file_eval.flush()
+  
+    # Code extraction heuristics (tries multiple common code block formats)
+    marker_fun = '```@funsearch.run\n'
+    idx_fun = output_text.find(marker_fun)
+    code_start = (idx_fun + 3) if idx_fun != -1 else -1
+  
+    code_start_md = output_text.find('```\n')
+    code_end_md = output_text.find('```', code_start_md + 3) if code_start_md != -1 else -1
+    code_start_py = output_text.find('```python\n')
+    code_end_py = output_text.find('```', code_start_py + 3) if code_start_py != -1 else -1
+    code_start_def = output_text.find('def priority_v2')
+  
+    if code_start_py != -1 and code_end_py != -1:
+      response = output_text[code_start_py + len('```python\n'):code_end_py]
+    elif code_start_md != -1 and code_end_md != -1:
+      response = output_text[code_start_md + len('```\n'):code_end_md]
+    elif code_start != -1:
+      response = output_text[code_start:]
+    elif code_start_def != -1:
+      response = output_text[code_start_def:]
+    else:
+      response = output_text
+  
+    # Saves after-process response for debugging purposes
+    with open('last_processed_responses.txt', 'a') as file_eval:
+      file_eval.write(f"AFTER POSTPROCESSING RESPONSE {self.prompt_count}\n{response}\n")
+      file_eval.flush()
+  
+    response = post_process(response)
+    response = autopep8.fix_code(response, options={'indent_size': 2})
+  
+    with open('last_eval.txt', 'a') as file_eval:
+      file_eval.write(f"FINAL RESPONSE\n{response}\n")
+      file_eval.flush()
+  
     if response:
       self._log(prompt, response, self.prompt_count)
     self.prompt_count += 1
