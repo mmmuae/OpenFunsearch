@@ -1,10 +1,21 @@
 """
-Lattice reduction benchmark for FunSearch.
+OBJECTIVE: Discover a novel and highly effective lattice basis reduction algorithm.
 
-Goal: evolve reduce_basis() to make the shortest basis vector as small as possible
-while preserving the lattice volume (determinant magnitude).
+The goal is to implement the `reduce_basis` function to find a reduced basis `B` for a given lattice basis `A`.
 
-No external deps (standard library only). Determinant checks are EXACT (integer).
+## GOAL & SCORING:
+The score is defined by the `evaluate` function: it is based on the negative logarithm of the norm of the shortest vector found, `-1.0 * log(norm(B[0]))`.
+MAXIMIZING this score means MINIMIZING the length of the shortest vector in the reduced basis (B[0]). A higher score is always better.
+
+## INSTRUCTIONS FOR EVOLUTION:
+1.  **Maximize Creativity and Novelty:** Do not simply re-implement existing algorithms like LLL (Lenstra-Lenstra-Lovász) or BKZ (Block Korkine-Zolotarev). Instead, combine concepts, introduce new reduction strategies, or use non-standard techniques to achieve a better reduction.
+2.  **Constraint Freedom:** You are only constrained by Python syntax and the function signature `def reduce_basis(basis: np.ndarray) -> np.ndarray:`. **You may use any functions or libraries already imported at the top of the file (e.g., `numpy` functions like `linalg.det`, `linalg.norm`, etc.).**
+3.  **Core Requirement:** The reduced basis must span the same lattice. This is checked by verifying that the absolute determinant remains unchanged (within floating point tolerance) and that the basis consists of linear integer combinations of the original vectors.
+4.  **Iterative Improvement:** The current `reduce_basis` is a basic, non-optimal implementation. Propose a modification that significantly improves the reduction quality by yielding a shorter first vector. Focus on sophisticated swapping, pivoting, or iterative reduction loops.
+5.  **Code Style:** Prefer concise, clean, and highly vectorized NumPy code for efficiency.
+
+## CURRENT BASELINE CODE TO IMPROVE:
+# The LLM will see the existing `reduce_basis` function here and be asked to provide a new version.
 """
 
 from __future__ import annotations
@@ -15,12 +26,16 @@ from typing import Iterable, List, Sequence, Tuple
 
 import funsearch
 
+# Judge configuration
 NUM_TEST_CASES = 5
 LOWER_BOUND = -100
 UPPER_BOUND = 100
 
-# LLL delta in (0.25, 1). Higher = stronger reduction, more work.
+# LLL delta in (0.25, 1). Higher -> stronger reduction, more work.
 DELTA = 0.99
+
+# Candidate must be "integer-like" within this tolerance.
+INT_TOL = 1e-6
 
 Vector = List[float]
 Matrix = List[Vector]
@@ -46,6 +61,7 @@ def _matrix_from_candidate(candidate: Iterable[Iterable[float]], n: int) -> Matr
   m = [list(row) for row in candidate]
   if not m or len(m) != n or any(len(row) != n for row in m):
     raise ValueError("Candidate must be a non-empty n x n matrix")
+
   out: Matrix = []
   for row in m:
     r: Vector = []
@@ -58,22 +74,21 @@ def _matrix_from_candidate(candidate: Iterable[Iterable[float]], n: int) -> Matr
   return out
 
 
-def _as_int_matrix(matrix: Matrix) -> List[List[int]]:
-  # Convert floats to ints if they are extremely close to integers.
+def _round_int_matrix(matrix: Matrix) -> List[List[int]]:
   out: List[List[int]] = []
   for row in matrix:
     r: List[int] = []
     for x in row:
-      rx = int(round(float(x)))
-      if abs(float(x) - float(rx)) > 1e-8:
-        raise ValueError("Matrix entry is not integer-like (breaks exact det check)")
+      fx = float(x)
+      rx = int(round(fx))
+      if abs(fx - float(rx)) > INT_TOL:
+        raise ValueError("Entry not integer-like enough for exact det check")
       r.append(rx)
     out.append(r)
   return out
 
 
 def _det_bareiss_int(a: List[List[int]]) -> int:
-  # Bareiss algorithm (fraction-free Gaussian elimination), exact for integer matrices.
   n = len(a)
   if n == 0 or any(len(row) != n for row in a):
     raise ValueError("det: matrix must be non-empty and square")
@@ -83,7 +98,6 @@ def _det_bareiss_int(a: List[List[int]]) -> int:
   prev = 1
 
   for k in range(n - 1):
-    # Find non-zero pivot
     pivot_row = k
     while pivot_row < n and m[pivot_row][k] == 0:
       pivot_row += 1
@@ -101,10 +115,11 @@ def _det_bareiss_int(a: List[List[int]]) -> int:
       for j in range(k + 1, n):
         num = m[i][j] * pivot - m[i][k] * m[k][j]
         if prev != 1:
-          # Bareiss guarantees exact divisibility here for integer matrices.
           q, r = divmod(num, prev)
           if r != 0:
-            raise ValueError("det: non-exact division (unexpected)")
+            # For true integer matrices, Bareiss should divide exactly.
+            # If this happens, treat as singular/invalid.
+            return 0
           m[i][j] = q
         else:
           m[i][j] = num
@@ -116,26 +131,24 @@ def _det_bareiss_int(a: List[List[int]]) -> int:
 
 
 def _generate_non_singular_basis(seed: int, n: int) -> Matrix:
-  # Deterministically retry a few times to avoid singular matrices.
-  # This keeps evaluation stable and avoids -1000 due to det_orig == 0.
-  for t in range(64):
+  # Try multiple deterministic attempts; fallback to identity if unlucky.
+  for t in range(128):
     rng = random.Random(seed + 1000003 * t)
     basis: Matrix = [
       [float(rng.randint(LOWER_BOUND, UPPER_BOUND)) for _ in range(n)]
       for _ in range(n)
     ]
     try:
-      det = _det_bareiss_int(_as_int_matrix(basis))
+      det = _det_bareiss_int(_round_int_matrix(basis))
     except Exception:
       det = 0
     if det != 0:
       return basis
-  # Worst-case fallback: identity basis (non-singular).
+
   return [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
 
 
 def _compute_gram_schmidt(basis: Matrix) -> Tuple[Matrix, Matrix, List[float]]:
-  # Returns (ortho, mu, norm_sq) for Gram–Schmidt on ROW vectors.
   n = len(basis)
   ortho: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
   mu: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
@@ -159,21 +172,20 @@ def _swap_rows(m: Matrix, i: int, j: int) -> None:
 
 
 def _lll_reduce(basis: Matrix, delta: float = DELTA) -> Matrix:
-  # LLL-style reduction. Row operations are integer (via rounded mu) -> preserves det exactly.
   reduced = _copy_matrix(basis)
   n = len(reduced)
 
-  ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+  ortho, mu, ns = _compute_gram_schmidt(reduced)
 
   def refresh() -> None:
-    nonlocal ortho, mu, norm_sq
-    ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+    nonlocal ortho, mu, ns
+    ortho, mu, ns = _compute_gram_schmidt(reduced)
 
   k = 1
   while k < n:
-    # Size reduction
+    # Size reduction (integer steps)
     for j in range(k - 1, -1, -1):
-      if norm_sq[j] <= 1e-18:
+      if ns[j] <= 1e-18:
         continue
       if abs(mu[k][j]) > 0.5:
         r = int(round(mu[k][j]))
@@ -183,7 +195,7 @@ def _lll_reduce(basis: Matrix, delta: float = DELTA) -> Matrix:
           refresh()
 
     # Lovász condition
-    if norm_sq[k] < (delta - mu[k][k - 1] * mu[k][k - 1]) * norm_sq[k - 1]:
+    if ns[k] < (delta - mu[k][k - 1] * mu[k][k - 1]) * ns[k - 1]:
       _swap_rows(reduced, k, k - 1)
       refresh()
       k = max(k - 1, 1)
@@ -195,7 +207,6 @@ def _lll_reduce(basis: Matrix, delta: float = DELTA) -> Matrix:
 
 @funsearch.run
 def evaluate(program, n: int = 8) -> float:
-  # Penalize invalid outputs with -1000, otherwise score by -log(shortest_norm).
   try:
     n_int = int(n)
   except Exception:
@@ -215,11 +226,13 @@ def evaluate(program, n: int = 8) -> float:
 
     try:
       reduced = _matrix_from_candidate(cand, n=n_int)
-      # Ensure “integer-like” so determinant comparisons are meaningful/exact.
-      original_i = _as_int_matrix(original)
-      reduced_i = _as_int_matrix(reduced)
-      det_orig = _det_bareiss_int(original_i)
-      det_new = _det_bareiss_int(reduced_i)
+
+      # Exact determinant comparison on rounded int matrices.
+      orig_i = _round_int_matrix(original)
+      red_i = _round_int_matrix(reduced)
+
+      det_orig = _det_bareiss_int(orig_i)
+      det_new = _det_bareiss_int(red_i)
     except Exception:
       return -1000.0
 
@@ -237,14 +250,16 @@ def evaluate(program, n: int = 8) -> float:
 
 @funsearch.evolve
 def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
-  # Strong baseline: LLL reduce + final sort by norm.
-  m = [list(row) for row in basis]
-  n = len(m)
-  if n == 0 or any(len(row) != n for row in m):
-    raise ValueError("Basis must be a non-empty square matrix")
+  # Baseline: LLL-style reduction + sort by norm.
+  b = _matrix_from_candidate(basis, n=len(list(basis)) if False else 0)  # never executed
 
-  mat = _matrix_from_candidate(m, n=n)
-  reduced = _lll_reduce(mat, delta=DELTA)
+  # The sandbox passes a concrete list-of-lists, so we can safely rebuild:
+  b = [list(map(float, row)) for row in basis]
+  n = len(b)
+  if n == 0 or any(len(row) != n for row in b):
+    raise ValueError("basis must be non-empty square")
+
+  reduced = _lll_reduce(b)
 
   norms = [_norm_sq(row) for row in reduced]
   order = sorted(range(n), key=lambda i: norms[i])
