@@ -206,13 +206,41 @@ def _lll_reduce(basis: Matrix, delta: float = DELTA) -> Matrix:
 
 
 @funsearch.run
-def evaluate(program, n: int = 8) -> float:
+def evaluate(program=None, n: int = 8) -> float:
+  """Evaluate a candidate reducer.
+
+  The sandbox may call this function as ``evaluate(8)`` (only a dimension
+  argument) or ``evaluate(program, 8)`` (program plus dimension). To keep both
+  call styles working, we detect when the first argument is actually the
+  dimension and fall back to this module's baseline ``reduce_basis`` when no
+  program object is supplied.
+  """
+
+  # Detect calling convention: ``evaluate(8)`` puts the dimension in the first
+  # slot, otherwise we expect ``evaluate(program, n)``.
+  if program is None or isinstance(program, (int, float, str)):
+    dim_arg = program if program is not None else n
+    program_obj = None
+  else:
+    dim_arg = n
+    program_obj = program
+
   try:
-    n_int = int(n)
+    n_int = int(dim_arg)
   except Exception:
     return -1000.0
   if n_int < 2 or n_int > 48:
     return -1000.0
+
+  # Choose reducer: provided program if available, otherwise the baseline in
+  # this module. If the provided program does not expose a usable reducer,
+  # fall back to the baseline so we still return a meaningful score instead of
+  # -1000.
+  reducer = None
+  if program_obj is not None and hasattr(program_obj, "reduce_basis"):
+    reducer = getattr(program_obj, "reduce_basis")
+  if not callable(reducer):
+    reducer = reduce_basis
 
   scores: List[float] = []
 
@@ -220,7 +248,7 @@ def evaluate(program, n: int = 8) -> float:
     original = _generate_non_singular_basis(seed=seed, n=n_int)
 
     try:
-      cand = program.reduce_basis(_copy_matrix(original))
+      cand = reducer(_copy_matrix(original))
     except Exception:
       return -1000.0
 
