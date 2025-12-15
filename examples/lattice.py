@@ -257,6 +257,8 @@ def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
   * Random unimodular "twists" to escape poor local minima.
   * Pairwise polishing that repeatedly size-reduces with fresh Gram-Schmidt
     information until convergence.
+  * A deterministic bounded enumeration around the first vector that tries
+    to explicitly find a shorter combination using the reduced basis.
 
   The result is the best candidate across multiple attempts, sorted by norm.
   """
@@ -327,6 +329,71 @@ def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
         break
     return red
 
+  def bounded_enum(mat_in: Matrix, window: int = 3) -> None:
+    """Enumerate small integer combinations to shorten the lead vector.
+
+    Starting from the current first vector, we explore combinations of nearby
+    vectors with coefficients in [-window, window]. When a shorter non-zero
+    combination is found, we replace the first vector and immediately
+    size-reduce again. Only unimodular row operations (adds/subtracts) are
+    used so the lattice volume is preserved.
+    """
+
+    n_vecs = len(mat_in)
+    base = _copy_matrix(mat_in)
+    best_v = base[0][:]
+    best_norm = _norm_sq(best_v)
+
+    # Precompute a lightly reduced scaffold for more meaningful combos.
+    scaffold = polish(deep_lll(base, delta=0.99))
+    candidates: List[Vector] = [scaffold[0][:]]
+
+    # Systematically try small integer blends with neighbors.
+    for i in range(1, n_vecs):
+      for coeff in range(-window, window + 1):
+        if coeff == 0:
+          continue
+        combo = [scaffold[0][k] + coeff * scaffold[i][k] for k in range(n_vecs)]
+        if _norm_sq(combo) < best_norm * 1.05:  # near ties are still useful
+          candidates.append(combo)
+
+    # A second pass that mixes two neighbors for extra reach.
+    if n_vecs >= 3:
+      for i in range(1, n_vecs):
+        for j in range(i + 1, n_vecs):
+          for ci in range(-window, window + 1):
+            if ci == 0:
+              continue
+            for cj in range(-window, window + 1):
+              if cj == 0:
+                continue
+              combo = [
+                scaffold[0][k] + ci * scaffold[i][k] + cj * scaffold[j][k]
+                for k in range(n_vecs)
+              ]
+              if _norm_sq(combo) < best_norm * 1.1:
+                candidates.append(combo)
+
+    # Evaluate and commit the strongest candidate found.
+    for vec in candidates:
+      nrm = _norm_sq(vec)
+      if nrm <= 1e-18:
+        continue
+      if nrm < best_norm:
+        best_norm = nrm
+        best_v = vec
+
+    # Replace first vector if improvement was discovered.
+    if best_norm + 1e-12 < _norm_sq(base[0]):
+      trial = _copy_matrix(mat_in)
+      trial[0] = best_v
+      ortho, _, ns = _compute_gram_schmidt(trial)
+      if ns[0] > 1e-18:
+        mat_in[0] = best_v
+        refreshed = polish(deep_lll(mat_in, delta=0.99))
+        for r in range(len(mat_in)):
+          mat_in[r] = refreshed[r][:]
+
   def random_twist(mat_in: Matrix, rng: random.Random, strength: int) -> None:
     """Apply small unimodular transformations to reshuffle the basis."""
     for _ in range(strength):
@@ -342,7 +409,7 @@ def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
 
   base = _copy_matrix(mat)
   rng = random.Random(1337)
-  attempts = max(4, min(10, 2 * n))
+  attempts = max(3, min(5, n))
 
   best = None
   best_score = float("inf")
@@ -351,8 +418,9 @@ def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
     candidate = _copy_matrix(base)
     if attempt:
       random_twist(candidate, rng, strength=attempt + 1)
-    candidate = deep_lll(candidate, delta=0.995)
+    candidate = deep_lll(candidate, delta=0.99)
     candidate = polish(candidate)
+    bounded_enum(candidate)
     cand_score = quality(candidate)
     if cand_score < best_score:
       best = candidate
