@@ -41,6 +41,13 @@ funsearch/venv/
 MANIFEST
 .env
 
+# Virtual environments
+venv/
+venv2/
+venv*/
+env/
+ENV/
+
 #programs
 program.py
 test.ipynb
