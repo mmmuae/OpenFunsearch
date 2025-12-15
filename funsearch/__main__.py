@@ -7,7 +7,6 @@ import time
 import datetime
 
 import click
-import llm
 import torch
 from llama_cpp import Llama
 
@@ -121,6 +120,8 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
     if ':' in model_name:
       os.environ.setdefault('LLM_LOAD_PLUGINS', 'llm-ollama')
 
+    # Import llm here after setting environment variables
+    import llm
     model = llm.get_model(model_name)
 
     # Some llm backends need a key; Ollama does not.
