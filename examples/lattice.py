@@ -1,232 +1,251 @@
-"""Lattice reduction benchmark for FunSearch.
+"""
+Lattice reduction benchmark for FunSearch.
 
-This module avoids external dependencies so it can run inside FunSearch
-sandboxes without extra installation steps. It provides a deterministic
-evaluation function and a solid baseline reduction routine so the FunSearch
-agent starts from a meaningful solution.
+Goal: evolve reduce_basis() to make the shortest basis vector as small as possible
+while preserving the lattice volume (determinant magnitude).
+
+No external deps (standard library only). Determinant checks are EXACT (integer).
 """
 
 from __future__ import annotations
 
 import math
 import random
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Sequence, Tuple
 
 import funsearch
 
-# CONFIGURATION
-DIMENSION = 10
 NUM_TEST_CASES = 5
 LOWER_BOUND = -100
 UPPER_BOUND = 100
-DELTA = 0.75  # Lovász condition parameter for LLL
+
+# LLL delta in (0.25, 1). Higher = stronger reduction, more work.
+DELTA = 0.99
 
 Vector = List[float]
 Matrix = List[Vector]
 
 
-def _generate_random_basis(seed: int) -> Matrix:
-    """Generate a random integer lattice basis with deterministic seeding."""
-    rng = random.Random(seed)
-    return [
-        [float(rng.randint(LOWER_BOUND, UPPER_BOUND)) for _ in range(DIMENSION)]
-        for _ in range(DIMENSION)
-    ]
+def _is_finite(x: float) -> bool:
+  return isinstance(x, (int, float)) and math.isfinite(float(x))
 
 
 def _dot(a: Sequence[float], b: Sequence[float]) -> float:
-    return sum(x * y for x, y in zip(a, b))
+  return sum(float(x) * float(y) for x, y in zip(a, b))
 
 
 def _norm_sq(v: Sequence[float]) -> float:
-    return _dot(v, v)
+  return _dot(v, v)
 
 
 def _copy_matrix(matrix: Sequence[Sequence[float]]) -> Matrix:
-    return [list(row) for row in matrix]
+  return [list(map(float, row)) for row in matrix]
 
 
-def _compute_gram_schmidt(basis: Matrix) -> tuple[Matrix, Matrix, List[float]]:
-    """Return Gram–Schmidt orthogonalization and coefficients.
-
-    Returns (B, mu, norm_sq) where B is the orthogonalized basis, mu contains the
-    projection coefficients, and norm_sq stores squared norms of the rows in B.
-    """
-    n = len(basis)
-    ortho: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
-    mu: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
-    norm_sq: List[float] = [0.0 for _ in range(n)]
-
-    for i in range(n):
-        ortho[i] = list(basis[i])
-        for j in range(i):
-            if norm_sq[j] <= 0.0:
-                continue
-            mu[i][j] = _dot(basis[i], ortho[j]) / norm_sq[j]
-            for k in range(n):
-                ortho[i][k] -= mu[i][j] * ortho[j][k]
-        norm_sq[i] = _norm_sq(ortho[i])
-    return ortho, mu, norm_sq
+def _matrix_from_candidate(candidate: Iterable[Iterable[float]], n: int) -> Matrix:
+  m = [list(row) for row in candidate]
+  if not m or len(m) != n or any(len(row) != n for row in m):
+    raise ValueError("Candidate must be a non-empty n x n matrix")
+  out: Matrix = []
+  for row in m:
+    r: Vector = []
+    for x in row:
+      fx = float(x)
+      if not _is_finite(fx):
+        raise ValueError("Non-finite entry in candidate matrix")
+      r.append(fx)
+    out.append(r)
+  return out
 
 
-def _swap_rows(matrix: Matrix, i: int, j: int) -> None:
-    matrix[i], matrix[j] = matrix[j], matrix[i]
+def _as_int_matrix(matrix: Matrix) -> List[List[int]]:
+  # Convert floats to ints if they are extremely close to integers.
+  out: List[List[int]] = []
+  for row in matrix:
+    r: List[int] = []
+    for x in row:
+      rx = int(round(float(x)))
+      if abs(float(x) - float(rx)) > 1e-8:
+        raise ValueError("Matrix entry is not integer-like (breaks exact det check)")
+      r.append(rx)
+    out.append(r)
+  return out
+
+
+def _det_bareiss_int(a: List[List[int]]) -> int:
+  # Bareiss algorithm (fraction-free Gaussian elimination), exact for integer matrices.
+  n = len(a)
+  if n == 0 or any(len(row) != n for row in a):
+    raise ValueError("det: matrix must be non-empty and square")
+
+  m = [row[:] for row in a]
+  det_sign = 1
+  prev = 1
+
+  for k in range(n - 1):
+    # Find non-zero pivot
+    pivot_row = k
+    while pivot_row < n and m[pivot_row][k] == 0:
+      pivot_row += 1
+    if pivot_row == n:
+      return 0
+    if pivot_row != k:
+      m[k], m[pivot_row] = m[pivot_row], m[k]
+      det_sign *= -1
+
+    pivot = m[k][k]
+    if pivot == 0:
+      return 0
+
+    for i in range(k + 1, n):
+      for j in range(k + 1, n):
+        num = m[i][j] * pivot - m[i][k] * m[k][j]
+        if prev != 1:
+          # Bareiss guarantees exact divisibility here for integer matrices.
+          q, r = divmod(num, prev)
+          if r != 0:
+            raise ValueError("det: non-exact division (unexpected)")
+          m[i][j] = q
+        else:
+          m[i][j] = num
+      m[i][k] = 0
+
+    prev = pivot
+
+  return det_sign * m[n - 1][n - 1]
+
+
+def _generate_non_singular_basis(seed: int, n: int) -> Matrix:
+  # Deterministically retry a few times to avoid singular matrices.
+  # This keeps evaluation stable and avoids -1000 due to det_orig == 0.
+  for t in range(64):
+    rng = random.Random(seed + 1000003 * t)
+    basis: Matrix = [
+      [float(rng.randint(LOWER_BOUND, UPPER_BOUND)) for _ in range(n)]
+      for _ in range(n)
+    ]
+    try:
+      det = _det_bareiss_int(_as_int_matrix(basis))
+    except Exception:
+      det = 0
+    if det != 0:
+      return basis
+  # Worst-case fallback: identity basis (non-singular).
+  return [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
+
+
+def _compute_gram_schmidt(basis: Matrix) -> Tuple[Matrix, Matrix, List[float]]:
+  # Returns (ortho, mu, norm_sq) for Gram–Schmidt on ROW vectors.
+  n = len(basis)
+  ortho: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
+  mu: Matrix = [[0.0 for _ in range(n)] for _ in range(n)]
+  norm_sq: List[float] = [0.0 for _ in range(n)]
+
+  for i in range(n):
+    ortho[i] = list(map(float, basis[i]))
+    for j in range(i):
+      if norm_sq[j] <= 1e-18:
+        continue
+      mu[i][j] = _dot(basis[i], ortho[j]) / norm_sq[j]
+      for k in range(n):
+        ortho[i][k] -= mu[i][j] * ortho[j][k]
+    norm_sq[i] = _norm_sq(ortho[i])
+
+  return ortho, mu, norm_sq
+
+
+def _swap_rows(m: Matrix, i: int, j: int) -> None:
+  m[i], m[j] = m[j], m[i]
 
 
 def _lll_reduce(basis: Matrix, delta: float = DELTA) -> Matrix:
-    """Perform a lightweight LLL reduction for a square basis matrix."""
-    reduced = _copy_matrix(basis)
-    n = len(reduced)
+  # LLL-style reduction. Row operations are integer (via rounded mu) -> preserves det exactly.
+  reduced = _copy_matrix(basis)
+  n = len(reduced)
+
+  ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+
+  def refresh() -> None:
+    nonlocal ortho, mu, norm_sq
     ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
 
-    def refresh(_: int) -> None:
-        nonlocal ortho, mu, norm_sq
-        ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
+  k = 1
+  while k < n:
+    # Size reduction
+    for j in range(k - 1, -1, -1):
+      if norm_sq[j] <= 1e-18:
+        continue
+      if abs(mu[k][j]) > 0.5:
+        r = int(round(mu[k][j]))
+        if r != 0:
+          for t in range(n):
+            reduced[k][t] -= float(r) * reduced[j][t]
+          refresh()
 
-    k = 1
-    while k < n:
-        # Size reduction step
-        for j in range(k - 1, -1, -1):
-            if abs(mu[k][j]) > 0.5:
-                factor = round(mu[k][j])
-                for t in range(n):
-                    reduced[k][t] -= factor * reduced[j][t]
-                refresh(k)
+    # Lovász condition
+    if norm_sq[k] < (delta - mu[k][k - 1] * mu[k][k - 1]) * norm_sq[k - 1]:
+      _swap_rows(reduced, k, k - 1)
+      refresh()
+      k = max(k - 1, 1)
+    else:
+      k += 1
 
-        # Lovász condition
-        if norm_sq[k] < (delta - mu[k][k - 1] ** 2) * norm_sq[k - 1]:
-            _swap_rows(reduced, k, k - 1)
-            refresh(k)
-            k = max(k - 1, 1)
-        else:
-            k += 1
-
-    return reduced
-
-
-def _determinant(matrix: Matrix) -> float:
-    """Compute determinant via Gaussian elimination with pivoting."""
-    n = len(matrix)
-    working = _copy_matrix(matrix)
-    det = 1.0
-    for i in range(n):
-        pivot_row = max(range(i, n), key=lambda r: abs(working[r][i]))
-        pivot = working[pivot_row][i]
-        if abs(pivot) < 1e-12:
-            return 0.0
-        if pivot_row != i:
-            _swap_rows(working, i, pivot_row)
-            det *= -1.0
-        det *= pivot
-        for r in range(i + 1, n):
-            factor = working[r][i] / pivot
-            for c in range(i, n):
-                working[r][c] -= factor * working[i][c]
-    return det
-
-
-def _matrix_from_candidate(candidate: Iterable[Iterable[float]]) -> Matrix:
-    matrix = [list(row) for row in candidate]
-    if not matrix or any(len(row) != len(matrix) for row in matrix):
-        raise ValueError("Basis must be a non-empty square matrix")
-    return matrix
-
-
-
-def _compute_gram_schmidt(basis: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return Gram–Schmidt orthogonalization and coefficients.
-
-    Returns (B, mu, norm_sq) where B is the orthogonalized basis, mu contains the
-    projection coefficients, and norm_sq stores squared norms of the rows in B.
-    """
-    n = basis.shape[0]
-    ortho = np.zeros_like(basis)
-    mu = np.zeros((n, n), dtype=float)
-    norm_sq = np.zeros(n, dtype=float)
-
-    for i in range(n):
-        ortho[i] = basis[i]
-        for j in range(i):
-            if norm_sq[j] <= 0.0:
-                continue
-            mu[i, j] = np.dot(basis[i], ortho[j]) / norm_sq[j]
-            ortho[i] -= mu[i, j] * ortho[j]
-        norm_sq[i] = np.dot(ortho[i], ortho[i])
-    return ortho, mu, norm_sq
-
-
-def _lll_reduce(basis: np.ndarray, delta: float = DELTA) -> np.ndarray:
-    """Perform a lightweight LLL reduction for a square basis matrix."""
-    reduced = np.array(basis, dtype=float, copy=True)
-    n = reduced.shape[0]
-    ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
-
-    def refresh(k: int) -> None:
-        nonlocal ortho, mu, norm_sq
-        ortho, mu, norm_sq = _compute_gram_schmidt(reduced)
-
-    k = 1
-    while k < n:
-        # Size reduction step
-        for j in range(k - 1, -1, -1):
-            if abs(mu[k, j]) > 0.5:
-                reduced[k] -= np.round(mu[k, j]) * reduced[j]
-                refresh(k)
-
-        # Lovász condition
-        if norm_sq[k] < (delta - mu[k, k - 1] ** 2) * norm_sq[k - 1]:
-            reduced[[k, k - 1]] = reduced[[k - 1, k]]
-            refresh(k)
-            k = max(k - 1, 1)
-        else:
-            k += 1
-
-    return reduced
+  return reduced
 
 
 @funsearch.run
-def evaluate(program) -> float:
-    """Judge function for FunSearch lattice experiments."""
-    scores: list[float] = []
+def evaluate(program, n: int = 8) -> float:
+  # Penalize invalid outputs with -1000, otherwise score by -log(shortest_norm).
+  try:
+    n_int = int(n)
+  except Exception:
+    return -1000.0
+  if n_int < 2 or n_int > 48:
+    return -1000.0
 
-    for seed in range(NUM_TEST_CASES):
-        original_basis = _generate_random_basis(seed=seed)
+  scores: List[float] = []
 
-        try:
-            candidate = program.reduce_basis(_copy_matrix(original_basis))
-        except Exception:
-            return -1000.0  # Program crashed
+  for seed in range(NUM_TEST_CASES):
+    original = _generate_non_singular_basis(seed=seed, n=n_int)
 
-        try:
-            matrix = _matrix_from_candidate(candidate)
-        except Exception:
-            return -1000.0  # Invalid output structure
+    try:
+      cand = program.reduce_basis(_copy_matrix(original))
+    except Exception:
+      return -1000.0
 
-        if len(matrix) != DIMENSION or any(len(row) != DIMENSION for row in matrix):
-            return -1000.0  # Dimension mismatch
+    try:
+      reduced = _matrix_from_candidate(cand, n=n_int)
+      # Ensure “integer-like” so determinant comparisons are meaningful/exact.
+      original_i = _as_int_matrix(original)
+      reduced_i = _as_int_matrix(reduced)
+      det_orig = _det_bareiss_int(original_i)
+      det_new = _det_bareiss_int(reduced_i)
+    except Exception:
+      return -1000.0
 
-        det_orig = abs(_determinant(original_basis))
-        det_new = abs(_determinant(matrix))
-        if det_new == 0.0 or abs(det_orig - det_new) > max(1e-4, 1e-4 * det_orig):
-            return -1000.0
+    if det_orig == 0 or det_new == 0:
+      return -1000.0
+    if abs(det_orig) != abs(det_new):
+      return -1000.0
 
-        norms = [math.sqrt(_norm_sq(row)) for row in matrix]
-        shortest = max(min(norms), 1e-6)
-        scores.append(-math.log(shortest))
+    norms = [math.sqrt(_norm_sq(row)) for row in reduced]
+    shortest = max(min(norms), 1e-6)
+    scores.append(-math.log(shortest))
 
-    return float(sum(scores) / len(scores))
-
+  return float(sum(scores) / len(scores))
 
 
 @funsearch.evolve
 def reduce_basis(basis: Iterable[Iterable[float]]) -> Matrix:
-    """Provide an LLL-inspired baseline as a strong starting point."""
-    matrix = _matrix_from_candidate(basis)
-    if len(matrix) != DIMENSION:
-        raise ValueError("Basis must match configured dimension")
+  # Strong baseline: LLL reduce + final sort by norm.
+  m = [list(row) for row in basis]
+  n = len(m)
+  if n == 0 or any(len(row) != n for row in m):
+    raise ValueError("Basis must be a non-empty square matrix")
 
-    reduced = _lll_reduce(matrix)
+  mat = _matrix_from_candidate(m, n=n)
+  reduced = _lll_reduce(mat, delta=DELTA)
 
-    norms = [_norm_sq(row) for row in reduced]
-    order = sorted(range(len(reduced)), key=lambda i: norms[i])
-    return [reduced[i] for i in order]
+  norms = [_norm_sq(row) for row in reduced]
+  order = sorted(range(n), key=lambda i: norms[i])
+  return [reduced[i] for i in order]
