@@ -491,6 +491,205 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
     features['all_ones_fraction'] = 0.0
     features['boundary_fraction'] = 0.0
 
+  # === EXPLOIT 1: PRNG STATE RECONSTRUCTION ===
+  # Test if keys match common PRNG patterns
+  if len(solved_puzzles) >= 10:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())]
+
+    # Test Linear Congruential Generator (LCG) pattern
+    # key[n+1] = (a * key[n] + c) mod m
+    if len(keys_sorted) >= 3:
+      try:
+        # Estimate LCG parameters from first few keys
+        k0, k1, k2 = keys_sorted[0], keys_sorted[1], keys_sorted[2]
+        # Simple test: check if differences are related
+        diff1 = k1 - k0
+        diff2 = k2 - k1
+        features['lcg_diff_ratio'] = (diff2 / diff1) if diff1 != 0 else 1.0
+        features['lcg_diff_ratio'] = abs(features['lcg_diff_ratio']) % 10.0  # Normalize
+      except:
+        features['lcg_diff_ratio'] = 1.0
+
+      # Test if XOR of consecutive keys shows pattern
+      xors = [keys_sorted[i] ^ keys_sorted[i+1] for i in range(len(keys_sorted)-1)]
+      features['key_xor_avg_popcount'] = sum(popcount(x) for x in xors) / len(xors) / 256.0 if xors else 0.5
+
+      # Test Mersenne Twister-like pattern (sequential outputs have specific correlations)
+      # MT outputs have period 2^19937-1, but show patterns in low bits
+      low_bits = [k & 0xFFFFFFFF for k in keys_sorted[:20]]
+      if len(low_bits) >= 10:
+        # Check autocorrelation in low bits
+        diffs = [low_bits[i+1] - low_bits[i] for i in range(len(low_bits)-1)]
+        features['mt_low_bit_variance'] = (np.var(diffs) / (2**32)) if len(diffs) > 1 else 0.5
+    else:
+      features['lcg_diff_ratio'] = 1.0
+      features['key_xor_avg_popcount'] = 0.5
+      features['mt_low_bit_variance'] = 0.5
+  else:
+    features['lcg_diff_ratio'] = 1.0
+    features['key_xor_avg_popcount'] = 0.5
+    features['mt_low_bit_variance'] = 0.5
+
+  # === EXPLOIT 2: BIP32/HD WALLET PATTERNS ===
+  # Test if consecutive keys show hierarchical deterministic derivation
+  if len(solved_puzzles) >= 5:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+
+    # BIP32 uses HMAC-SHA512, creates specific patterns
+    # Check if key differences follow modular pattern
+    if len(keys_sorted) >= 3:
+      diffs = [keys_sorted[i+1] - keys_sorted[i] for i in range(len(keys_sorted)-1)]
+
+      # HD wallets often have similar step sizes
+      features['hd_diff_consistency'] = 1.0 / (1.0 + np.std(diffs)) if len(diffs) > 1 else 0.0
+
+      # Check if differences are powers of 2 (common in derivation)
+      power_of_2_count = sum(1 for d in diffs if d > 0 and (d & (d-1)) == 0)
+      features['hd_power_of_2_fraction'] = power_of_2_count / len(diffs) if diffs else 0.0
+    else:
+      features['hd_diff_consistency'] = 0.0
+      features['hd_power_of_2_fraction'] = 0.0
+  else:
+    features['hd_diff_consistency'] = 0.0
+    features['hd_power_of_2_fraction'] = 0.0
+
+  # === EXPLOIT 3: TIMESTAMP/TEMPORAL PATTERNS ===
+  # The puzzle was created 2015-01-15, test if keys encode timestamps
+  PUZZLE_TIMESTAMP = 1421280000  # Unix timestamp for 2015-01-15
+
+  # Test if any key is related to timestamp
+  if len(solved_puzzles) >= 10:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+
+    # Check if keys contain timestamp in some form
+    timestamp_correlations = []
+    for k in keys_sorted:
+      # Test various timestamp encodings
+      k_mod_time = k % PUZZLE_TIMESTAMP
+      timestamp_correlations.append(k_mod_time)
+
+    features['timestamp_correlation'] = np.mean(timestamp_correlations) / PUZZLE_TIMESTAMP
+  else:
+    features['timestamp_correlation'] = 0.5
+
+  # === EXPLOIT 4: FLOATING POINT ARTIFACTS ===
+  # Test if position ratios show IEEE 754 rounding errors
+  if len(solved_positions) >= 5:
+    positions = [p[1] for p in solved_positions]
+
+    # Check if positions cluster at specific float values
+    # IEEE 754 double has 53-bit mantissa, creates specific rounding
+    positions_scaled = [p * (2**53) for p in positions]
+    positions_rounded = [round(p) for p in positions_scaled]
+    rounding_errors = [abs(positions_scaled[i] - positions_rounded[i]) for i in range(len(positions))]
+
+    features['float_rounding_error'] = np.mean(rounding_errors) if rounding_errors else 0.5
+
+    # Check if positions are exact fractions (1/2, 1/4, 1/8, etc.)
+    fraction_matches = 0
+    for p in positions:
+      for denom in [2, 3, 4, 5, 8, 10, 16, 32, 64, 100]:
+        for numer in range(1, denom):
+          if abs(p - numer/denom) < 0.001:
+            fraction_matches += 1
+            break
+    features['exact_fraction_matches'] = fraction_matches / len(positions)
+  else:
+    features['float_rounding_error'] = 0.5
+    features['exact_fraction_matches'] = 0.0
+
+  # === EXPLOIT 5: HASH CHAIN PATTERNS ===
+  # Test if keys follow hash(previous_key) pattern
+  if len(solved_puzzles) >= 5:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+
+    # Simple hash chain test: key[n+1] related to hash(key[n])?
+    hash_correlations = []
+    for i in range(len(keys_sorted)-1):
+      # Use Python's hash function
+      h = hash(keys_sorted[i]) % (2**64)
+      correlation = (h ^ keys_sorted[i+1]) % 10000
+      hash_correlations.append(correlation)
+
+    features['hash_chain_correlation'] = np.mean(hash_correlations) / 10000.0 if hash_correlations else 0.5
+  else:
+    features['hash_chain_correlation'] = 0.5
+
+  # === EXPLOIT 6: MEMORY/TIMING SIDE CHANNELS ===
+  # Low-order bits show cache/memory artifacts
+  if len(solved_puzzles) >= 10:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-20:]]
+
+    # Check low 8 bits for bias (cache line = 64 bytes = patterns in low bits)
+    low_8_bits = [k & 0xFF for k in keys_sorted]
+    features['low_8_bit_entropy'] = len(set(low_8_bits)) / min(256, len(low_8_bits))
+
+    # Check if adjacent keys have correlated low bits (timing artifact)
+    low_bit_diffs = [abs((keys_sorted[i] & 0xFF) - (keys_sorted[i+1] & 0xFF)) for i in range(len(keys_sorted)-1)]
+    features['low_bit_correlation'] = 1.0 / (1.0 + np.std(low_bit_diffs)) if len(low_bit_diffs) > 1 else 0.5
+  else:
+    features['low_8_bit_entropy'] = 0.5
+    features['low_bit_correlation'] = 0.5
+
+  # === EXPLOIT 7: WALLET SOFTWARE QUIRKS ===
+  # Different wallets have different generation patterns
+  if len(solved_puzzles) >= 10:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+
+    # Bitcoin Core: Tends to use keypool with sequential generation
+    # Check if keys are close together (batch generation)
+    key_diffs = [keys_sorted[i+1] - keys_sorted[i] for i in range(len(keys_sorted)-1)]
+    small_diff_count = sum(1 for d in key_diffs if d < 1000000)
+    features['wallet_batch_generation'] = small_diff_count / len(key_diffs) if key_diffs else 0.0
+
+    # Electrum: Uses mnemonic, creates specific patterns
+    # Test if keys could be from mnemonic (specific entropy patterns)
+    entropies = [bin(k).count('1') / k.bit_length() for k in keys_sorted if k.bit_length() > 0]
+    features['mnemonic_entropy_pattern'] = np.std(entropies) if len(entropies) > 1 else 0.5
+  else:
+    features['wallet_batch_generation'] = 0.0
+    features['mnemonic_entropy_pattern'] = 0.5
+
+  # === EXPLOIT 8: PSYCHOLOGICAL/HUMAN PATTERNS ===
+  # If keys were chosen semi-manually, look for human biases
+  if len(solved_positions) >= 10:
+    positions = [p[1] for p in solved_positions]
+
+    # Avoid boundaries: Humans avoid 0% and 100%
+    boundary_distance = [min(p, 1-p) for p in positions]
+    features['human_boundary_avoidance'] = np.mean(boundary_distance)
+
+    # Prefer round percentages: 25%, 50%, 75%
+    round_percent_matches = sum(1 for p in positions if any(abs(p - r) < 0.05 for r in [0.25, 0.5, 0.75]))
+    features['human_round_percent'] = round_percent_matches / len(positions)
+
+    # Clustering around middle (50%)
+    middle_clustering = sum(1 for p in positions if 0.3 < p < 0.7) / len(positions)
+    features['human_middle_bias'] = middle_clustering
+  else:
+    features['human_boundary_avoidance'] = 0.5
+    features['human_round_percent'] = 0.0
+    features['human_middle_bias'] = 0.5
+
+  # === EXPLOIT 9: MODULAR ARITHMETIC EXPLOITS ===
+  # Test if keys follow modular patterns
+  if len(solved_puzzles) >= 10:
+    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+
+    # Test various moduli for patterns
+    for mod in [97, 101, 127, 251, 509, 1021]:  # Prime moduli
+      remainders = [k % mod for k in keys_sorted]
+      unique_ratio = len(set(remainders)) / len(remainders)
+      features[f'mod_{mod}_diversity'] = unique_ratio
+
+    # Test if keys are coprime to common numbers
+    coprime_count = sum(1 for k in keys_sorted if math.gcd(k, 2*3*5*7*11*13) == 1)
+    features['coprime_to_small_primes'] = coprime_count / len(keys_sorted)
+  else:
+    for mod in [97, 101, 127, 251, 509, 1021]:
+      features[f'mod_{mod}_diversity'] = 0.5
+    features['coprime_to_small_primes'] = 0.5
+
   return features
 
 
