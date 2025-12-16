@@ -33,6 +33,35 @@ import math
 import numpy as np
 import types
 
+
+# Precomputed decimal digits for transcendental constants (no decimal points).
+# These strings include the integer part as the first character to mirror the
+# original positional logic used in the feature computation (n=0 -> integer
+# part, n=1 -> first digit after the decimal, etc.).
+PI_DIGITS = (
+  "3141592653589793238462643383279502884197169399375105820974944592"
+  "3078164062862089986280348253421170679821480865132823066470938446"
+  "0955058223172535940812848111745028410270193852110555964462294895"
+  "4930381964428810975665933446128475648233786783165271201909145648"
+  "566923460348610454326648213393607260249141273"
+)
+
+E_DIGITS = (
+  "2718281828459045235360287471352662497757247093699959574966967627"
+  "7240766303535475945713821785251664274274663919320030599218174135"
+  "9662904357290033429526059563073813232862794349076323382988075319"
+  "252886939849646510582093923982948879332036250944933718140"
+)
+
+
+def _digit_from_constant(constant_digits, index):
+  """Return the digit at the given position (wraps if beyond provided length)."""
+  if index < 0:
+    return 0
+  if index < len(constant_digits):
+    return int(constant_digits[index])
+  return int(constant_digits[index % len(constant_digits)])
+
 # ==============================================================================
 # COMPLETE DATASET OF SOLVED BITCOIN PUZZLES
 # ==============================================================================
@@ -755,16 +784,16 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   features['bit_count'] = puzzle_number
 
   # Metadata from the canonical dataset (range and compressed key prefixes)
+  range_min, range_max = get_puzzle_range(puzzle_number)
+  features['range_min'] = range_min
+  features['range_max'] = range_max
+
   meta = PUZZLE_METADATA.get(puzzle_number)
   if meta:
-    features['range_min'] = meta['range_min']
-    features['range_max'] = meta['range_max']
     # Public key metadata
     features['pubkey_prefix'] = int(meta['public_key'][:2], 16) / 255.0
     features['hash160_prefix'] = int(meta['hash160_compressed'][:2], 16) / 255.0
   else:
-    features['range_min'] = None
-    features['range_max'] = None
     features['pubkey_prefix'] = 0.0
     features['hash160_prefix'] = 0.0
 
@@ -853,8 +882,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   features['hash_mod'] = (hash(n) % 10000) / 10000.0
 
   # Transcendental numbers
-  features['pi_digit'] = (int(math.pi * (10 ** n)) % 10) / 10.0
-  features['e_digit'] = (int(math.e * (10 ** n)) % 10) / 10.0
+  features['pi_digit'] = _digit_from_constant(PI_DIGITS, n) / 10.0
+  features['e_digit'] = _digit_from_constant(E_DIGITS, n) / 10.0
 
   # === METHOD 3: HIDDEN MARKOV MODEL - STATE PATTERNS ===
   if len(solved_positions) >= 5:
