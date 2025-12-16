@@ -59,12 +59,13 @@ def post_process(code: str) -> str:
 class LLM:
   """Language model that predicts continuation of provided source code."""
 
-  def __init__(self, samples_per_prompt: int, model, log_path=None, model_type='gpt') -> None:
+  def __init__(self, samples_per_prompt: int, model, log_path=None, model_type='gpt', function_to_evolve='priority') -> None:
     self._samples_per_prompt = samples_per_prompt
     self.model = model
     self.prompt_count = 0
     self.log_path = log_path
     self.model_type = model_type
+    self.function_to_evolve = function_to_evolve
 
   def _draw_sample(self, prompt: str) -> str:
   
@@ -105,7 +106,8 @@ class LLM:
     code_end_md = output_text.find('```', code_start_md + 3) if code_start_md != -1 else -1
     code_start_py = output_text.find('```python\n')
     code_end_py = output_text.find('```', code_start_py + 3) if code_start_py != -1 else -1
-    code_start_def = output_text.find('def priority_v2')
+    # Use dynamic function name instead of hardcoded 'priority_v2'
+    code_start_def = output_text.find(f'def {self.function_to_evolve}_v')
   
     if code_start_py != -1 and code_end_py != -1:
       response = output_text[code_start_py + len('```python\n'):code_end_py]
