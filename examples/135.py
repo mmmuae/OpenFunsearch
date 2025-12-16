@@ -99,6 +99,21 @@ def evaluate(program) -> float:
   LLM.
   """
 
+  # Rebuild the ECC namespace if the sandbox omits module globals.
+  global crypto
+  if "crypto" not in globals():
+    crypto = types.SimpleNamespace(
+      P=P,
+      N=N,
+      A=A,
+      B=B,
+      G=G,
+      mod_inv=mod_inv,
+      decompress_pubkey=decompress_pubkey,
+      point_add=point_add,
+      scalar_mult=scalar_mult,
+    )
+
   score = 0.0
   for _ in range(5):
     # Generate a random k in a test range
