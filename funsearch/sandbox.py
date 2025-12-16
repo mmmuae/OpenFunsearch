@@ -131,8 +131,10 @@ class ExternalProcessSandbox(DummySandbox):
       retcode = self._exec(call_data_folder, input_path, error_file)
       self.call_count += 1
 
+      # Always save program.py for analysis (not just on errors)
+      self._save_diagnostics(program, call_data_folder)
+
       if retcode != 0:
-        self._save_diagnostics(program, call_data_folder)
         return None, False
 
       output_file = call_data_folder / f"output.pickle"
@@ -141,8 +143,7 @@ class ExternalProcessSandbox(DummySandbox):
         return out, True
     except Exception as e:
       logging.debug(f"Could not execute code: {e}")
-    self._save_diagnostics(program, call_data_folder)
-    return None, False
+      return None, False
 
   @staticmethod
   def _save_diagnostics(program: str, output_path: pathlib.Path):
