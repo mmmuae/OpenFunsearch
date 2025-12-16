@@ -90,7 +90,7 @@ RANGE_START = 0x4000000000000000000000000000000000
 
 
 @funsearch.run
-def evaluate(program) -> float:
+def evaluate(seed: int) -> float:
   """Score a candidate ``heuristic_priority`` implementation.
 
   The evaluator exercises the heuristic on a smaller window that mimics the
@@ -114,10 +114,11 @@ def evaluate(program) -> float:
       scalar_mult=scalar_mult,
     )
 
+  rng = np.random.default_rng(seed)
   score = 0.0
   for _ in range(5):
     # Generate a random k in a test range
-    test_k = np.random.randint(1, 2**40)
+    test_k = rng.integers(1, 2**40)
     test_Q = crypto.scalar_mult(crypto.G, test_k)
 
     # Ask AI to predict the 'energy' or 'likelihood' of a candidate scalar
@@ -125,7 +126,7 @@ def evaluate(program) -> float:
     candidates = []
     for i in range(1, 500):
       p_val = crypto.scalar_mult(crypto.G, i)
-      p_score = program.heuristic_priority(
+      p_score = heuristic_priority(
         p_val[0], p_val[1], test_Q[0], test_Q[1]
       )
       candidates.append((p_score, i))
