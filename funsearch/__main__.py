@@ -140,24 +140,25 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
         n_gpu_layers=25
       )
 
-  
-  lm = sampler.LLM(2, model, log_path, model_type)
-  
+
   file_run = open('all_runs.txt', 'a')
   file_run.write(f'{formatted_date} {problem_name} {inputs} {model_name}\n')
-  file_run.flush()  
+  file_run.flush()
   file_run.close()
-  
+
   file_eval = open('last_eval.txt', 'w')
   file_eval.write(f'{formatted_date} {problem_name} {inputs} {model_name}\n')
   file_eval.flush()  # Ensures all internal buffers associated with file are written to disk
-  
+
   if not log_path.exists():
       log_path.mkdir(parents=True)
       logging.info(f"Writing logs to {log_path}")
 
   specification = spec_file.read()
   function_to_evolve, function_to_run = core._extract_function_names(specification)
+
+  # Create LLM after extracting function_to_evolve so it knows what function to look for
+  lm = sampler.LLM(2, model, log_path, model_type, function_to_evolve)
   template = code_manipulation.text_to_program(specification)
 
   conf = config.Config(num_evaluators=1)
