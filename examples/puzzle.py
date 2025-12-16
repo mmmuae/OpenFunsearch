@@ -1342,7 +1342,6 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   # Basic features
   features['puzzle_number'] = puzzle_number
   features['bit_count'] = puzzle_number
-  features['n'] = puzzle_number  # Alias for puzzle_number (commonly used as 'n')
 
   # Metadata from the canonical dataset (range and compressed key prefixes)
   range_min, range_max = get_puzzle_range(puzzle_number)
@@ -2085,12 +2084,16 @@ def priority(features: dict) -> float:
   # Ensure prediction stays within [0, 1]
   pred = max(0.0, min(1.0, pred))
 
-  # DISABLED: Transcendental constant blending was diluting all predictions by 50%
-  # This prevented the LLM from discovering better patterns during evolution
-  # The averaging: pred = (pred + constant) / 2.0 flattened the optimization landscape
-  #
-  # If you want to use PI/E digits, they should be added as features and used
-  # as one signal among many, not as a final 50% dilution of all predictions.
+  # Add a new pattern: use transcendental constants to predict
+  # This assumes that the puzzle positions are somehow encoded in PI or E
+  n = features.get('n', 0)
+  if n < len(PI_DIGITS):
+    pi_digit = int(PI_DIGITS[n])
+    e_digit = int(E_DIGITS[n]) if n < len(E_DIGITS) else 0
+    # Combine digits to form a fraction
+    combined_digit = (pi_digit + e_digit) % 10
+    # Normalize to [0, 1]
+    pred = (pred + combined_digit / 10.0) / 2.0
 
   return float(pred)
 
