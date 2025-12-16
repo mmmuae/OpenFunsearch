@@ -1,9 +1,13 @@
 """Elliptic-curve scalar search heuristic for Puzzle 135.
 
 Guidelines for the LLM (keep these instructions intact):
+- Always return a single, complete Python module that starts at column 0.
+  Repeat the imports and ``evaluate`` exactly as provided; do not wrap code in
+  markdown, prose, or extra indentation.
 - Only adjust the body of ``heuristic_priority``; keep function signatures and
-  imports unchanged.
-- Use plain Python (no markdown or extra text) with 4-space indentation.
+  top-level layout unchanged. Avoid adding helper functions or globals.
+- Use plain Python with 4-space indentation inside functions—never tabs or
+  mixed spacing—and finish with a trailing newline.
 - Keep ``evaluate`` as the authoritative scoring function and avoid altering
   its logic or randomness handling.
 - Prefer short, deterministic arithmetic; avoid I/O, randomness, or external
