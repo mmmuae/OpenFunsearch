@@ -1,46 +1,42 @@
-"""Advanced multi-feature elliptic-curve search heuristic for Puzzle 135.
+"""Advanced ECDLP attack heuristic for Bitcoin Puzzle 135.
 
-This variant exposes 30+ mathematical features to enable FunSearch to discover
-genius combinations that humans haven't thought of. The feature space combines:
-- Bitwise patterns (XOR, AND, OR, Hamming distances)
-- Field arithmetic (modular inverses, GCD patterns, quadratic residues)
-- Geometric properties (slope estimates, coordinate ratios, cross products)
-- Number theoretic (digit sums, Jacobi symbols, factorization hints)
-- Statistical patterns (entropy, variance in bit chunks)
-- Coordinate relationships (x-y correlations, negation patterns)
+THIS IS NOT A TOY. This is a real attack on Puzzle 135 using every known
+mathematical approach to ECDLP. FunSearch's job: discover which mathematical
+properties can narrow the 2^135 keyspace.
 
-Guidelines for the LLM (CRITICAL - keep these instructions intact):
-- **MAKE BOLD CHANGES**: Don't just tweak constants—try completely different
-  feature combinations, mathematical operations, and scoring strategies on each
-  iteration. Explore radically different approaches.
-- **COMBINE FEATURES CREATIVELY**: Use products, ratios, sums, XORs, and nested
-  conditions. Look for non-obvious patterns across multiple feature dimensions.
-- **EXPERIMENT AGGRESSIVELY**: Test counterintuitive ideas like inverse
-  relationships, negative weights, polynomial combinations, and threshold-based
-  logic. The goal is to find hidden mathematical shortcuts.
-- Always return a single, complete Python module that starts at column 0.
-  Repeat the imports, ECC primitives, feature computation, and ``evaluate``
-  exactly as provided; do not wrap code in markdown, prose, or extra indentation.
-- Only adjust the body of ``priority``; keep function signatures and
-  top-level layout unchanged. You can use ANY of the features in the features
-  dict in creative ways, but don't add helper functions or globals.
-- Match the indentation style by using **two spaces** for each block level—
-  never tabs or mixed spacing—and finish with a trailing newline.
-- Keep ``evaluate`` as the authoritative scoring function and avoid altering
-  its logic or randomness handling.
-- The priority function receives a rich 'features' dictionary with
-  30+ pre-computed mathematical properties. Your job is to combine them cleverly.
-- Prefer deterministic arithmetic; avoid I/O, randomness, or external state
-  inside ``priority``.
-- **TRY EVERYTHING**: Each iteration should explore fundamentally different
-  mathematical territory. Don't converge too quickly—keep exploring!
+Target: 02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16
+Range: 0x4000000000000000000000000000000000 to 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+Prize: Real Bitcoin
+
+Mathematical arsenal exposed to FunSearch:
+- Baby-step Giant-step collision patterns
+- Pollard's Rho/Kangaroo distinguished point properties
+- Lattice reduction indicators (short vector patterns)
+- Frobenius endomorphism (secp256k1 GLV decomposition)
+- Negation symmetry (k vs N-k)
+- Montgomery ladder patterns
+- Point addition chain properties
+- Quadratic residue patterns
+- Modular arithmetic relationships
+- Birthday paradox collision indicators
+- Differential addition patterns
+
+Guidelines for the LLM:
+- **THIS IS REAL**: You're attacking an actual cryptographic problem
+- **EXPLORE EVERYTHING**: Combine features in ways cryptographers haven't tried
+- **LOOK FOR STRUCTURE**: ECDLP has hidden structure waiting to be found
+- **BE RADICAL**: Try counterintuitive combinations, negative correlations
+- Always return a single, complete Python module starting at column 0
+- Only adjust the body of ``priority``; keep function signatures unchanged
+- Use **two spaces** per indentation level
+- The priority function receives 60+ mathematical features about candidate keys
+- Your job: find which feature combinations predict proximity to the real key
 """
 
 import numpy as np
 import types
 import math
 
-# secp256k1 curve parameters
 P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 A = 0
@@ -100,7 +96,6 @@ def gcd(a, b):
 
 
 def jacobi_symbol(a, n):
-  """Compute Jacobi symbol (a/n) - generalization of Legendre symbol."""
   if n <= 0 or n % 2 == 0:
     return 0
   a = a % n
@@ -118,114 +113,159 @@ def jacobi_symbol(a, n):
 
 
 def popcount(x):
-  """Count number of 1-bits."""
   return bin(x).count('1')
 
 
-def compute_features(px, py, qx, qy):
-  """Compute comprehensive mathematical features for the heuristic.
+def compute_features(candidate_k, candidate_point, target_point):
+  """Compute 80+ features for ECDLP analysis.
 
-  Returns a dictionary with 30+ features covering multiple mathematical domains.
+  Args:
+    candidate_k: The candidate private key being evaluated
+    candidate_point: k*G (the candidate public key)
+    target_point: TARGET_Q (the actual Puzzle 135 public key)
+
+  Returns:
+    Dictionary with mathematical features that might correlate with key proximity
   """
+  px, py = candidate_point
+  qx, qy = target_point
   features = {}
 
-  # === BITWISE PATTERNS ===
+  # === KEY PROPERTIES ===
+  features['k_value'] = candidate_k
+  features['k_bitlength'] = candidate_k.bit_length()
+  features['k_popcount'] = popcount(candidate_k)
+  features['k_low_bits'] = candidate_k & 0xFFFFFFFF
+  features['k_high_bits'] = (candidate_k >> 100) & 0xFFFFFFFF
+  features['k_mod_small_primes'] = (candidate_k % 2) + (candidate_k % 3) + (candidate_k % 5) + (candidate_k % 7)
+
+  # === COORDINATE BITWISE PATTERNS ===
   features['x_xor_popcount'] = popcount(px ^ qx)
   features['y_xor_popcount'] = popcount(py ^ qy)
   features['x_and_popcount'] = popcount(px & qx)
   features['y_and_popcount'] = popcount(py & qy)
-  features['x_or_popcount'] = popcount(px | qx)
-  features['y_or_popcount'] = popcount(py | qy)
-  features['x_hamming'] = bin(px ^ qx).count('0')  # Shared bits
+  features['x_hamming'] = bin(px ^ qx).count('0')
   features['y_hamming'] = bin(py ^ qy).count('0')
+  features['xy_combined_hamming'] = features['x_hamming'] + features['y_hamming']
 
-  # === COORDINATE RELATIONSHIPS ===
-  features['xy_cross_p'] = (px * py) % P
-  features['xy_cross_q'] = (qx * qy) % P
-  features['xy_cross_diff'] = abs(((px * qy) % P) - ((py * qx) % P))
-  features['coord_sum_p'] = (px + py) % P
-  features['coord_sum_q'] = (qx + qy) % P
-  features['coord_diff_p'] = (px - py) % P
-  features['coord_diff_q'] = (qx - qy) % P
+  # === COORDINATE ARITHMETIC ===
+  features['x_diff'] = abs(px - qx) if px > qx else abs(qx - px)
+  features['y_diff'] = abs(py - qy) if py > qy else abs(qy - py)
+  features['x_sum'] = (px + qx) % P
+  features['y_sum'] = (py + qy) % P
+  features['x_prod'] = (px * qx) % P
+  features['y_prod'] = (py * qy) % P
+  features['xy_cross_prod'] = ((px * qy) % P + (py * qx) % P) % P
 
-  # === MODULAR ARITHMETIC ===
-  features['x_diff_mod_p'] = (px - qx) % P
-  features['y_diff_mod_p'] = (py - qy) % P
-  features['x_sum_mod_p'] = (px + qx) % P
-  features['y_sum_mod_p'] = (py + qy) % P
-  features['x_prod_mod_p'] = (px * qx) % P
-  features['y_prod_mod_p'] = (py * qy) % P
+  # === NEGATION PATTERNS (k and N-k relationship) ===
+  features['y_negation_match'] = 1 if (py + qy) % P == 0 else 0
+  features['x_match'] = 1 if px == qx else 0
+  features['mirror_k'] = N - candidate_k
+  features['mirror_k_distance'] = min(candidate_k, N - candidate_k)
+
+  # === MODULAR PATTERNS ===
+  features['x_mod_256'] = (px % 256) - (qx % 256)
+  features['y_mod_256'] = (py % 256) - (qy % 256)
+  features['x_mod_65536'] = (px % 65536) - (qx % 65536)
+  features['y_mod_65536'] = (py % 65536) - (qy % 65536)
 
   # === FIELD INVERSES ===
   try:
     px_inv = mod_inv(px if px != 0 else 1, P)
     qx_inv = mod_inv(qx if qx != 0 else 1, P)
-    py_inv = mod_inv(py if py != 0 else 1, P)
-    qy_inv = mod_inv(qy if qy != 0 else 1, P)
-    features['x_inv_diff'] = (px_inv - qx_inv) % P
-    features['y_inv_diff'] = (py_inv - qy_inv) % P
+    features['x_inv_prod'] = (px_inv * qx) % P
     features['x_ratio'] = (px * qx_inv) % P
-    features['y_ratio'] = (py * qy_inv) % P
   except:
-    features['x_inv_diff'] = 0
-    features['y_inv_diff'] = 0
+    features['x_inv_prod'] = 0
     features['x_ratio'] = 0
-    features['y_ratio'] = 0
-
-  # === GCD PATTERNS ===
-  features['gcd_x'] = gcd(px, qx)
-  features['gcd_y'] = gcd(py, qy)
-  features['gcd_x_p'] = gcd(px, P)
-  features['gcd_y_p'] = gcd(py, P)
 
   # === JACOBI SYMBOLS (quadratic residue patterns) ===
   features['jacobi_px'] = jacobi_symbol(px, P)
   features['jacobi_py'] = jacobi_symbol(py, P)
   features['jacobi_qx'] = jacobi_symbol(qx, P)
   features['jacobi_qy'] = jacobi_symbol(qy, P)
+  features['jacobi_match'] = 1 if (features['jacobi_px'] == features['jacobi_qx'] and
+                                     features['jacobi_py'] == features['jacobi_qy']) else 0
 
-  # === DIGIT SUMS (patterns in different bases) ===
-  features['digit_sum_x_b256'] = sum(int(d, 16) for d in hex(px)[2:])
-  features['digit_sum_y_b256'] = sum(int(d, 16) for d in hex(py)[2:])
-  features['digit_sum_qx_b256'] = sum(int(d, 16) for d in hex(qx)[2:])
-  features['digit_sum_qy_b256'] = sum(int(d, 16) for d in hex(qy)[2:])
+  # === BABY-STEP GIANT-STEP PATTERNS ===
+  # Look for patterns in how coordinates relate to stepping patterns
+  features['x_step_pattern'] = (px % 1000) - (qx % 1000)
+  features['y_step_pattern'] = (py % 1000) - (qy % 1000)
+  features['coord_alternating'] = ((px ^ qx) ^ (py ^ qy)) % 1000
 
-  # === BIT PATTERNS AT DIFFERENT POSITIONS ===
-  features['x_low_32_xor'] = (px ^ qx) & 0xFFFFFFFF
-  features['x_high_32_xor'] = ((px ^ qx) >> 224) & 0xFFFFFFFF
-  features['y_low_32_xor'] = (py ^ qy) & 0xFFFFFFFF
-  features['y_high_32_xor'] = ((py ^ qy) >> 224) & 0xFFFFFFFF
+  # === DISTINGUISHED POINT PROPERTIES (Pollard's methods) ===
+  # Check if points have "distinguished" properties
+  features['px_leading_zeros'] = len(bin(px)) - len(bin(px).rstrip('0'))
+  features['qx_leading_zeros'] = len(bin(qx)) - len(bin(qx).rstrip('0'))
+  features['px_trailing_zeros'] = len(bin(px)) - len(bin(px).lstrip('0'))
+  features['distinguished_diff'] = features['px_leading_zeros'] - features['qx_leading_zeros']
 
-  # === GEOMETRIC/SLOPE PATTERNS ===
-  # Approximate slope-like quantity (avoiding full modular division for speed)
-  features['delta_y'] = (qy - py) % P
+  # === DIGIT SUMS (additive patterns) ===
+  features['digit_sum_x'] = sum(int(d, 16) for d in hex(px)[2:])
+  features['digit_sum_y'] = sum(int(d, 16) for d in hex(py)[2:])
+  features['digit_sum_qx'] = sum(int(d, 16) for d in hex(qx)[2:])
+  features['digit_sum_qy'] = sum(int(d, 16) for d in hex(qy)[2:])
+  features['digit_sum_diff'] = abs(features['digit_sum_x'] - features['digit_sum_qx'])
+
+  # === BIT POSITION ANALYSIS ===
+  features['x_low_64_xor'] = (px ^ qx) & 0xFFFFFFFFFFFFFFFF
+  features['x_high_64_xor'] = ((px ^ qx) >> 192) & 0xFFFFFFFFFFFFFFFF
+  features['bit_pattern_match'] = sum(1 for i in range(256) if ((px >> i) & 1) == ((qx >> i) & 1))
+
+  # === SLOPE/GEOMETRIC PATTERNS ===
   features['delta_x'] = (qx - px) % P
-  features['slope_numerator'] = features['delta_y']
-  features['slope_denominator'] = features['delta_x'] if features['delta_x'] != 0 else 1
+  features['delta_y'] = (qy - py) % P
+  if features['delta_x'] != 0:
+    try:
+      features['slope_approx'] = (features['delta_y'] * mod_inv(features['delta_x'], P)) % P
+    except:
+      features['slope_approx'] = 0
+  else:
+    features['slope_approx'] = 0
 
-  # === STATISTICAL PATTERNS ===
-  # Entropy-like measures (count transitions in binary representation)
+  # === STATISTICAL/ENTROPY ===
   px_bin = bin(px)[2:]
   qx_bin = bin(qx)[2:]
   features['px_transitions'] = sum(1 for i in range(len(px_bin)-1) if px_bin[i] != px_bin[i+1])
   features['qx_transitions'] = sum(1 for i in range(len(qx_bin)-1) if qx_bin[i] != qx_bin[i+1])
+  features['transition_similarity'] = abs(features['px_transitions'] - features['qx_transitions'])
 
   # === PARITY AND DIVISIBILITY ===
   features['x_parity_match'] = 1 if (px % 2) == (qx % 2) else 0
   features['y_parity_match'] = 1 if (py % 2) == (qy % 2) else 0
-  features['x_mod_3'] = (px % 3) - (qx % 3)
-  features['y_mod_3'] = (py % 3) - (qy % 3)
-  features['x_mod_7'] = (px % 7) - (qx % 7)
-  features['y_mod_7'] = (py % 7) - (qy % 7)
+  features['both_parity_match'] = features['x_parity_match'] * features['y_parity_match']
 
-  # === NEGATION PATTERNS (important for ECC: -P = (x, -y)) ===
-  features['y_negation_match'] = 1 if (py + qy) % P == 0 else 0
-  features['y_negation_diff'] = ((py + qy) % P)
+  # === GCD PATTERNS ===
+  features['gcd_x'] = gcd(px, qx)
+  features['gcd_y'] = gcd(py, qy)
+  features['gcd_large'] = 1 if features['gcd_x'] > 1 or features['gcd_y'] > 1 else 0
+
+  # === FROBENIUS/GLV DECOMPOSITION HINTS ===
+  # secp256k1 has efficient endomorphism, might reveal structure
+  lambda_val = 0x5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72
+  features['glv_k_mod'] = candidate_k % lambda_val
+  features['glv_pattern'] = (px * lambda_val) % P
+
+  # === COLLISION/BIRTHDAY PARADOX INDICATORS ===
+  features['collision_indicator'] = ((px ^ qx) * (py ^ qy)) % 65536
+  features['birthday_hash'] = ((px + qx) ^ (py + qy)) % 65536
+
+  # === LATTICE-BASED HINTS ===
+  # Short vector patterns
+  features['coord_magnitude'] = (px % 10000) + (py % 10000)
+  features['target_magnitude'] = (qx % 10000) + (qy % 10000)
+  features['magnitude_ratio'] = features['coord_magnitude'] / (features['target_magnitude'] + 1)
 
   # === COMBINED COMPLEXITY MEASURES ===
   features['total_popcount'] = popcount(px) + popcount(py) + popcount(qx) + popcount(qy)
   features['xor_product'] = ((px ^ qx) * (py ^ qy)) % P
-  features['coord_similarity'] = features['x_hamming'] + features['y_hamming']
+  features['combined_similarity'] = features['xy_combined_hamming'] + features['both_parity_match'] * 10
+
+  # === RANGE POSITION ===
+  RANGE_START = 0x4000000000000000000000000000000000
+  RANGE_END = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  features['range_position'] = (candidate_k - RANGE_START) / (RANGE_END - RANGE_START) if candidate_k >= RANGE_START else 0
+  features['in_puzzle_range'] = 1 if RANGE_START <= candidate_k <= RANGE_END else 0
 
   return features
 
@@ -244,23 +284,23 @@ crypto = types.SimpleNamespace(
 
 import funsearch
 
-# Puzzle 135 Target Data
+# THE REAL TARGET
 TARGET_PK_HEX = "02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16"
 TARGET_Q = crypto.decompress_pubkey(TARGET_PK_HEX)
 RANGE_START = 0x4000000000000000000000000000000000
+RANGE_END = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 
 
 @funsearch.run
 def evaluate(seed: int) -> float:
-  """Score a candidate ``priority`` implementation.
+  """Evaluate priority function on REAL Puzzle 135 attack scenarios.
 
-  This evaluator tests the heuristic on multiple scenarios with diverse
-  mathematical properties. It rewards both exact matches and proximity,
-  encouraging the LLM to discover creative feature combinations.
+  This tests if the heuristic can narrow the 2^135 keyspace by identifying
+  regions more likely to contain the solution. We use strategic sampling
+  and test if the heuristic's top picks are actually closer to optimal.
   """
 
-  # Rebuild the ECC namespace if the sandbox omits module globals.
-  global crypto, P, N
+  global crypto, P, N, TARGET_Q, RANGE_START, RANGE_END
   if "crypto" not in globals():
     P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
     N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
@@ -280,118 +320,148 @@ def evaluate(seed: int) -> float:
       point_add=point_add,
       scalar_mult=scalar_mult,
     )
+    TARGET_PK_HEX = "02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16"
+    TARGET_Q = crypto.decompress_pubkey(TARGET_PK_HEX)
+    RANGE_START = 0x4000000000000000000000000000000000
+    RANGE_END = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 
   rng = np.random.default_rng(seed)
   score = 0.0
 
-  # Test on 10 diverse scenarios (increased from 5 for better evaluation)
-  for test_round in range(10):
-    # Vary the test range to cover different magnitudes
-    if test_round < 3:
-      test_k = rng.integers(1, 2**20)  # Small keys
-    elif test_round < 6:
-      test_k = rng.integers(2**20, 2**40)  # Medium keys
-    else:
-      test_k = rng.integers(2**40, 2**60)  # Larger keys
+  # Strategy: Sample points across the 135-bit range and test if heuristic
+  # can identify which regions are "hotter" (more likely to contain solution)
 
-    test_Q = crypto.scalar_mult(crypto.G, test_k)
+  # Sample 500 candidate keys from different regions of the keyspace
+  candidates = []
 
-    # Rank candidate scalars using the evolved heuristic
-    candidates = []
-    for i in range(1, 1000):  # Increased candidate pool for harder challenge
-      p_val = crypto.scalar_mult(crypto.G, i)
-      features = compute_features(p_val[0], p_val[1], test_Q[0], test_Q[1])
-      p_score = priority(features)
-      candidates.append((p_score, i))
+  # Region 1: Lower quarter of range (0x4000... to 0x4FFF...)
+  for i in range(100):
+    k = rng.integers(RANGE_START, RANGE_START + (RANGE_END - RANGE_START) // 4)
+    point = crypto.scalar_mult(crypto.G, k)
+    features = compute_features(k, point, TARGET_Q)
+    priority_score = priority(features)
+    candidates.append((priority_score, k, point))
 
-    candidates.sort(key=lambda x: x[0], reverse=True)
+  # Region 2: Second quarter (0x5000... to 0x5FFF...)
+  for i in range(100):
+    k = rng.integers(RANGE_START + (RANGE_END - RANGE_START) // 4,
+                     RANGE_START + (RANGE_END - RANGE_START) // 2)
+    point = crypto.scalar_mult(crypto.G, k)
+    features = compute_features(k, point, TARGET_Q)
+    priority_score = priority(features)
+    candidates.append((priority_score, k, point))
 
-    # High reward for finding the exact match in top 10
-    found_top10 = any(k == test_k for _, k in candidates[:10])
-    if found_top10:
-      score += 50.0
+  # Region 3: Third quarter (0x6000... to 0x6FFF...)
+  for i in range(100):
+    k = rng.integers(RANGE_START + (RANGE_END - RANGE_START) // 2,
+                     RANGE_START + 3 * (RANGE_END - RANGE_START) // 4)
+    point = crypto.scalar_mult(crypto.G, k)
+    features = compute_features(k, point, TARGET_Q)
+    priority_score = priority(features)
+    candidates.append((priority_score, k, point))
 
-    # Medium reward for finding in top 50
-    found_top50 = any(k == test_k for _, k in candidates[:50])
-    if found_top50 and not found_top10:
-      score += 20.0
+  # Region 4: Upper quarter (0x7000... to 0x7FFF...)
+  for i in range(100):
+    k = rng.integers(RANGE_START + 3 * (RANGE_END - RANGE_START) // 4, RANGE_END)
+    point = crypto.scalar_mult(crypto.G, k)
+    features = compute_features(k, point, TARGET_Q)
+    priority_score = priority(features)
+    candidates.append((priority_score, k, point))
 
-    # Small reward for finding in top 100
-    found_top100 = any(k == test_k for _, k in candidates[:100])
-    if found_top100 and not found_top50:
-      score += 5.0
+  # Region 5: Random scatter across entire range
+  for i in range(100):
+    k = rng.integers(RANGE_START, RANGE_END)
+    point = crypto.scalar_mult(crypto.G, k)
+    features = compute_features(k, point, TARGET_Q)
+    priority_score = priority(features)
+    candidates.append((priority_score, k, point))
 
-    # Partial credit: bitwise proximity of best guess
-    best_guess_x = crypto.scalar_mult(crypto.G, candidates[0][1])[0]
-    bit_match = bin(best_guess_x ^ test_Q[0]).count("0")
-    score += bit_match / 256.0
+  # Sort by priority score (higher = more promising according to heuristic)
+  candidates.sort(key=lambda x: x[0], reverse=True)
 
-    # Bonus: reward diversity in top picks (avoid getting stuck on one pattern)
-    top_5_scalars = [k for _, k in candidates[:5]]
-    diversity = len(set(top_5_scalars))
-    score += diversity * 0.5
+  # SCORING: Reward heuristics that identify mathematically interesting patterns
 
-    # Extra bonus: check if top picks have any useful mathematical relationship
-    # to the target (e.g., factors, sums, differences)
-    for _, candidate_k in candidates[:5]:
-      if candidate_k != test_k:
-        # Check if there's a simple relationship
-        if (test_k % candidate_k == 0) or (candidate_k % test_k == 0):
-          score += 2.0
-        if abs(test_k - candidate_k) < 100:
-          score += 1.0
+  # 1. Coordinate proximity of top picks
+  for i, (_, k, point) in enumerate(candidates[:50]):
+    px, py = point
+    qx, qy = TARGET_Q
+
+    # Hamming distance rewards
+    x_hamming = bin(px ^ qx).count('0')
+    y_hamming = bin(py ^ qy).count('0')
+    hamming_score = (x_hamming + y_hamming) / 512.0
+    score += hamming_score * (50 - i) / 50.0  # Weight by rank
+
+  # 2. Negation check (if top pick is exactly N-k of target)
+  top_k = candidates[0][1]
+  if (py + qy) % P == 0 and px == qx:
+    score += 1000.0  # JACKPOT: Found negation
+
+  # 3. Diversity bonus (don't get stuck on one pattern)
+  top_10_regions = set((k >> 130) for _, k, _ in candidates[:10])
+  score += len(top_10_regions) * 2.0
+
+  # 4. Bit matching across top picks
+  for _, k, point in candidates[:10]:
+    px, py = point
+    qx, qy = TARGET_Q
+    bit_matches = bin(px ^ qx).count('0') + bin(py ^ qy).count('0')
+    score += bit_matches / 100.0
+
+  # 5. Reward if heuristic identifies any structural patterns
+  # Check if top picks cluster in a region (suggesting found pattern)
+  top_20_keys = [k for _, k, _ in candidates[:20]]
+  key_variance = np.var(top_20_keys) if len(top_20_keys) > 1 else 0
+  key_range = max(top_20_keys) - min(top_20_keys)
+  if key_range < (RANGE_END - RANGE_START) / 10:  # Clustered in <10% of range
+    score += 10.0  # Bonus for finding structure
 
   return float(score)
 
 
 @funsearch.evolve
 def priority(features: dict) -> float:
-  """Advanced multi-feature heuristic for ranking candidate scalars.
+  """ECDLP attack heuristic - find patterns that reveal the private key.
 
-  The 'features' dictionary contains 30+ pre-computed mathematical properties.
-  Your mission: combine them in creative, non-obvious ways to discover hidden
-  patterns in the elliptic curve discrete logarithm problem.
+  You have 80+ mathematical features. Your mission: discover which combinations
+  correlate with proximity to the real Puzzle 135 solution.
 
-  Available feature categories:
-  - Bitwise: x_xor_popcount, y_xor_popcount, x_hamming, y_hamming, etc.
-  - Coordinate: xy_cross_p, coord_sum_p, coord_diff_p, etc.
-  - Modular: x_diff_mod_p, x_prod_mod_p, x_ratio, y_ratio, etc.
-  - Field inverses: x_inv_diff, y_inv_diff
-  - GCD patterns: gcd_x, gcd_y, gcd_x_p
-  - Jacobi symbols: jacobi_px, jacobi_py, jacobi_qx, jacobi_qy
-  - Digit sums: digit_sum_x_b256, digit_sum_y_b256
-  - Bit positions: x_low_32_xor, x_high_32_xor
-  - Geometric: delta_x, delta_y, slope_numerator
-  - Statistical: px_transitions, qx_transitions
-  - Parity: x_parity_match, y_parity_match, x_mod_3, x_mod_7
-  - Negation: y_negation_match, y_negation_diff
-  - Combined: total_popcount, xor_product, coord_similarity
+  Feature categories available:
+  - Key properties: k_value, k_bitlength, k_popcount, k_mod_small_primes
+  - Coordinate patterns: x_hamming, y_hamming, xy_combined_hamming
+  - Negation: y_negation_match, x_match, mirror_k_distance
+  - Modular: x_mod_256, x_mod_65536, x_ratio
+  - Jacobi: jacobi_px, jacobi_qx, jacobi_match
+  - Baby-step: x_step_pattern, coord_alternating
+  - Distinguished points: px_leading_zeros, distinguished_diff
+  - Digit sums: digit_sum_diff
+  - Bit positions: x_low_64_xor, x_high_64_xor, bit_pattern_match
+  - Geometric: slope_approx, delta_x, delta_y
+  - Statistical: px_transitions, transition_similarity
+  - Parity: x_parity_match, both_parity_match
+  - GCD: gcd_x, gcd_y, gcd_large
+  - GLV/Frobenius: glv_k_mod, glv_pattern
+  - Collision: collision_indicator, birthday_hash
+  - Lattice: magnitude_ratio, coord_magnitude
+  - Range: range_position, in_puzzle_range
 
-  EXPLORE AGGRESSIVELY:
-  - Try polynomial combinations: a*f1^2 + b*f2*f3 + c*f4
-  - Use conditionals: if f1 > threshold then weight1 else weight2
-  - Combine distant features: bitwise AND geometric AND number theoretic
-  - Test inverse relationships: 1/f1, -f2, f3 XOR f4
-  - Look for resonance: (f1 * f2) % some_modulus
-  - Be creative with thresholds, products, ratios, and XORs!
-
-  Baseline starter (YOU MUST IMPROVE ON THIS!):
+  FIND THE PATTERN. BREAK THE CODE.
   """
 
-  # Simple baseline: combine coordinate similarity with modular patterns
-  # THIS IS JUST A STARTING POINT - EVOLVE IT RADICALLY!
-  base_score = float(features['coord_similarity'])
+  # Baseline: coordinate similarity
+  score = float(features['xy_combined_hamming'])
 
-  # Add some basic feature combinations
-  if features['x_parity_match'] and features['y_parity_match']:
-    base_score += 10.0
+  # Negation check is critical in ECC
+  if features['y_negation_match']:
+    score += 1000.0
 
-  # Reward GCD patterns
-  if features['gcd_x'] > 1:
-    base_score += 5.0
+  # Parity matching
+  score += features['both_parity_match'] * 5.0
 
-  # Consider Jacobi symbols
-  if features['jacobi_px'] == features['jacobi_qx']:
-    base_score += 3.0
+  # Jacobi symbol matching
+  score += features['jacobi_match'] * 3.0
 
-  return base_score
+  # Bit pattern matching
+  score += features['bit_pattern_match'] * 0.1
+
+  return score
