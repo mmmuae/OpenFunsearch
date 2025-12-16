@@ -1396,25 +1396,132 @@ def priority(features: dict) -> float:
 
   GOAL: Find the formula that generated all puzzle keys!
   """
+  """Predict position_ratio for a puzzle based on features.
 
-  # Baseline: simple recursive prediction
-  # Formula: next position is weighted average of previous positions
+  This is the FORMULA we're searching for!
 
-  pred = 0.5  # Default middle
+  Available features (200+):
+  - Fractal: pos_n_minus_1, pos_n_minus_2, pos_diff_1, fractal_coef_a, ...
+  - Kolmogorov: linear_n, quadratic_n, mod_2, lcg_simple, hash_mod, ...
+  - HMM: pos_mean, pos_std, state_increasing, trend_strength, ...
+  - Wavelet: fft_dc, fft_fund, autocorr_1, ...
+  - Topology: embed_var, embed_mean_dist, ...
+  - Patterns: edge_fraction, arithmetic_consistency, is_power_of_2, ...
 
-  # Use last position with some noise from fractal coefficient
-  if 'pos_n_minus_1' in features:
-    pred = features['pos_n_minus_1'] * 0.7
+  Return: Predicted position_ratio (0.0 to 1.0)
 
-  # Add trend
-  if 'pos_diff_1' in features:
-    pred += features['pos_diff_1'] * 0.3
+  GOAL: Find the formula that generated all puzzle keys!
+  """
+  # Extract key features
+  pos_n_minus_1 = features.get('pos_n_minus_1', 0.5)
+  pos_n_minus_2 = features.get('pos_n_minus_2', 0.5)
+  pos_diff_1 = features.get('pos_diff_1', 0.0)
+  mod_2 = features.get('mod_2', 0)
+  linear_n = features.get('linear_n', 0)
+  quadratic_n = features.get('quadratic_n', 0)
+  is_power_of_2 = features.get('is_power_of_2', 0)
+  trend_strength = features.get('trend_strength', 0.0)
+  fft_dc = features.get('fft_dc', 0.0)
+  fft_fund = features.get('fft_fund', 0.0)
+  autocorr_1 = features.get('autocorr_1', 0.0)
+  embed_var = features.get('embed_var', 0.0)
+  embed_mean_dist = features.get('embed_mean_dist', 0.0)
+  edge_fraction = features.get('edge_fraction', 0.0)
+  arithmetic_consistency = features.get('arithmetic_consistency', 0.0)
+  hash_mod = features.get('hash_mod', 0)
+  lcg_simple = features.get('lcg_simple', 0)
+  pos_mean = features.get('pos_mean', 0.5)
+  pos_std = features.get('pos_std', 0.0)
+  state_increasing = features.get('state_increasing', 0)
 
-  # Adjust based on modular patterns
-  if 'mod_2' in features and features['mod_2'] == 0:
-    pred += 0.05
+  # Base prediction using last known position
+  pred = pos_n_minus_1
 
-  # Keep in valid range
+  # Fractal pattern detection and correction
+  if pos_n_minus_1 > 0 and pos_n_minus_2 > 0:
+    diff = abs(pos_n_minus_1 - pos_n_minus_2)
+    if diff < 0.1:
+      # Stable pattern, follow trend
+      pred = pos_n_minus_1 + pos_diff_1 * 0.5
+    else:
+      # Unstable, revert to base
+      pred = pos_n_minus_1 * 0.8 + pos_n_minus_2 * 0.2
+
+  # Apply linear trend adjustment
+  if linear_n > 0:
+    pred += (linear_n * 0.01) % 1.0
+
+  # Apply quadratic trend adjustment
+  if quadratic_n > 0:
+    pred += (quadratic_n * 0.001) % 1.0
+
+  # Special handling for power-of-2 puzzles
+  if is_power_of_2:
+    pred = 0.25 + (pred * 0.5)
+
+  # Apply modular correction
+  if mod_2 == 0:
+    pred += 0.05  # Bias towards higher positions for even mod cases
+  elif mod_2 == 1:
+    pred -= 0.05  # Bias towards lower positions for odd mod cases
+
+  # Apply trend strength adjustment
+  pred += trend_strength * 0.1
+
+  # Apply frequency domain corrections
+  if fft_dc > 0.5:
+    pred *= 0.9
+  elif fft_dc < 0.1:
+    pred *= 1.1
+
+  # Apply autocorrelation correction
+  if autocorr_1 > 0.5:
+    pred = pred * 0.8 + 0.2 * pos_n_minus_1
+  elif autocorr_1 < -0.5:
+    pred = pred * 1.2 - 0.2 * pos_n_minus_1
+
+  # Apply embedding dimension corrections
+  if embed_var > 0.1:
+    pred = pred * 0.95 + 0.05 * pos_n_minus_1
+  elif embed_var < 0.01:
+    pred = pred * 1.05 - 0.05 * pos_n_minus_1
+
+  # Apply edge fraction correction
+  if edge_fraction > 0.5:
+    pred = pred * 0.9 + 0.1 * 0.25
+  elif edge_fraction < 0.1:
+    pred = pred * 1.1 - 0.1 * 0.25
+
+  # Apply arithmetic consistency correction
+  if arithmetic_consistency > 0.5:
+    pred = pred * 0.95 + 0.05 * 0.5
+  elif arithmetic_consistency < 0.1:
+    pred = pred * 1.05 - 0.05 * 0.5
+
+  # Apply hash-based correction
+  if hash_mod > 0:
+    pred += (hash_mod * 0.001) % 1.0
+
+  # Apply LCG correction
+  if lcg_simple > 0:
+    pred += (lcg_simple * 0.0001) % 1.0
+
+  # Apply mean and standard deviation corrections
+  if pos_mean > 0.5:
+    pred = pred * 0.95 + 0.05 * pos_mean
+  elif pos_mean < 0.2:
+    pred = pred * 1.05 - 0.05 * pos_mean
+
+  if pos_std > 0.1:
+    pred = pred * 0.9 + 0.1 * 0.5
+  elif pos_std < 0.01:
+    pred = pred * 1.1 - 0.1 * 0.5
+
+  # Apply state increasing correction
+  if state_increasing:
+    pred = pred * 0.95 + 0.05 * 0.75
+
+  # Ensure prediction stays within [0, 1]
   pred = max(0.0, min(1.0, pred))
 
   return float(pred)
