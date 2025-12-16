@@ -1342,6 +1342,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   # Basic features
   features['puzzle_number'] = puzzle_number
   features['bit_count'] = puzzle_number
+  # Alias used by some heuristic predictors
+  features['n'] = puzzle_number
 
   # Metadata from the canonical dataset (range and compressed key prefixes)
   range_min, range_max = get_puzzle_range(puzzle_number)
@@ -2086,7 +2088,7 @@ def priority(features: dict) -> float:
 
   # Add a new pattern: use transcendental constants to predict
   # This assumes that the puzzle positions are somehow encoded in PI or E
-  n = features.get('n', 0)
+  n = int(features.get('n', features.get('puzzle_number', 0)))
   if n < len(PI_DIGITS):
     pi_digit = int(PI_DIGITS[n])
     e_digit = int(E_DIGITS[n]) if n < len(E_DIGITS) else 0
