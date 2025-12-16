@@ -66,6 +66,7 @@ def evaluate(program) -> float:
   return float(score)
 
 
+
 @funsearch.evolve
 def heuristic_priority(px, py, qx, qy) -> float:
   """Baseline heuristic for ranking candidate scalars.
