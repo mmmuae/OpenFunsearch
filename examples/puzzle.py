@@ -1342,6 +1342,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   # Basic features
   features['puzzle_number'] = puzzle_number
   features['bit_count'] = puzzle_number
+  # Alias used by some heuristic predictors
+  features['n'] = puzzle_number
 
   # Metadata from the canonical dataset (range and compressed key prefixes)
   range_min, range_max = get_puzzle_range(puzzle_number)
@@ -1875,7 +1877,6 @@ def evaluate(seed: int) -> float:
   if "TARGET_PUZZLE" not in globals() or TARGET_PUZZLE is None:
     TARGET_PUZZLE = TARGET_PUZZLES[0] if TARGET_PUZZLES else None
 
-  rng = np.random.default_rng(seed)
   score = 0.0
 
   # Test the formula on ALL solved puzzles
@@ -1937,19 +1938,6 @@ def evaluate(seed: int) -> float:
     ss_tot = np.sum((actuals - np.mean(actuals)) ** 2)
     r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
     score += r2 * 100.0 if r2 > 0 else 0.0
-
-  # BONUS: Predict each unsolved target and reward non-trivial outputs
-  bonus_targets = list(TARGET_PUZZLES)
-  rng.shuffle(bonus_targets)
-
-  for target_bits in bonus_targets:
-    features_target = compute_puzzle_features(target_bits, SOLVED_PUZZLES)
-    pred_target = priority(features_target)
-    pred_target = max(0.0, min(1.0, pred_target))
-
-    if 0.0 < pred_target < 1.0 and abs(pred_target - 0.5) > 0.01:
-      bonus = 20.0 if target_bits in UNSOLVED_WITH_PUBLIC_KEYS else 10.0
-      score += bonus
 
   return float(score)
 
@@ -2084,16 +2072,15 @@ def priority(features: dict) -> float:
   # Ensure prediction stays within [0, 1]
   pred = max(0.0, min(1.0, pred))
 
-  # Add a new pattern: use transcendental constants to predict
-  # This assumes that the puzzle positions are somehow encoded in PI or E
-  n = features.get('n', 0)
-  if n < len(PI_DIGITS):
-    pi_digit = int(PI_DIGITS[n])
-    e_digit = int(E_DIGITS[n]) if n < len(E_DIGITS) else 0
-    # Combine digits to form a fraction
-    combined_digit = (pi_digit + e_digit) % 10
-    # Normalize to [0, 1]
-    pred = (pred + combined_digit / 10.0) / 2.0
+  # Add a new pattern: use transcendental constants to predict.
+  # Keep the influence small so we don't drown out learned structure.
+  idx = int(features.get('n', features.get('puzzle_number', 0)))
+  idx = max(0, idx)
+  pi_digit = _digit_from_constant(PI_DIGITS, idx)
+  e_digit = _digit_from_constant(E_DIGITS, idx)
+  combined_digit = (pi_digit + e_digit) % 10
+  trans_hint = combined_digit / 10.0
+  pred = pred * 0.9 + trans_hint * 0.1
 
   return float(pred)
 
