@@ -1299,19 +1299,20 @@ def popcount(x):
 
 
 # ==============================================================================
-# FEATURE COMPUTATION - 300+ FEATURES FROM ALL METHODS
+# FEATURE COMPUTATION - ~90 FEATURES FROM ALL METHODS
 # ==============================================================================
 
 def compute_puzzle_features(puzzle_number, solved_puzzles):
-  """Compute ALL possible features - position, pubkeys, hashes, ECC properties.
+  """Compute available features - position, pubkeys, hashes, ECC properties.
 
   Args:
     puzzle_number: The puzzle we're trying to predict
     solved_puzzles: Dictionary of {puzzle_num: private_key}
 
   Returns:
-    Dictionary with 200+ features from all mathematical methods
+    Dictionary with ~90 features from all mathematical methods
   """
+  historical_puzzles = {k: v for k, v in solved_puzzles.items() if k < puzzle_number}
   features = {}
 
   # Recreate metadata if globals were stripped by the sandbox.
@@ -1337,12 +1338,11 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   else:
     features['hash160_prefix'] = 0.0
 
-  # Get position ratios of all solved puzzles
+  # Get position ratios of all prior solved puzzles
   solved_positions = []
-  for pnum in sorted(solved_puzzles.keys()):
-    if pnum < puzzle_number:
-      ratio = get_position_ratio(pnum, solved_puzzles[pnum])
-      solved_positions.append((pnum, ratio))
+  for pnum in sorted(historical_puzzles.keys()):
+    ratio = get_position_ratio(pnum, historical_puzzles[pnum])
+    solved_positions.append((pnum, ratio))
 
   # === METHOD 1: FRACTAL / SELF-SIMILAR PATTERNS ===
   if len(solved_positions) >= 2:
@@ -1545,24 +1545,22 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === PUBLIC KEY COORDINATE PATTERNS ===
   # Analyze public keys of solved puzzles (use small subset for speed)
-  if len(solved_puzzles) >= 3:
+  if len(historical_puzzles) >= 3:
     # Get public keys of last few puzzles whose keys are cheap to compute
     pubkey_data = []
     compute_limit = 2 ** 40
     max_pubkey_samples = 10
 
     eligible_puzzles = []
-    for pnum in sorted(solved_puzzles.keys(), reverse=True):
-      if pnum >= puzzle_number:
-        continue
-      if solved_puzzles[pnum] < compute_limit:
+    for pnum in sorted(historical_puzzles.keys(), reverse=True):
+      if historical_puzzles[pnum] < compute_limit:
         eligible_puzzles.append(pnum)
       if len(eligible_puzzles) >= max_pubkey_samples:
         break
 
     for pnum in sorted(eligible_puzzles):
       try:
-        Qx, Qy = get_public_key(solved_puzzles[pnum])
+        Qx, Qy = get_public_key(historical_puzzles[pnum])
         pubkey_data.append((pnum, Qx, Qy))
       except:
         pass
@@ -1609,9 +1607,9 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
     features['pubkey_y_trend'] = 0
 
   # === PRIVATE KEY BIT PATTERNS ACROSS PUZZLES ===
-  if len(solved_puzzles) >= 5:
+  if len(historical_puzzles) >= 5:
     # Analyze private key bit patterns
-    keys = [solved_puzzles[pnum] for pnum in sorted(solved_puzzles.keys())[-10:]]
+    keys = [historical_puzzles[pnum] for pnum in sorted(historical_puzzles.keys())[-10:]]
 
     # Average popcount
     features['key_popcount_avg'] = sum(popcount(k) for k in keys) / len(keys) / 256.0
@@ -1622,10 +1620,10 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
     # Check if keys are at range boundaries
     boundary_count = 0
-    for pnum in sorted(solved_puzzles.keys())[-10:]:
-      if pnum in solved_puzzles:
+    for pnum in sorted(historical_puzzles.keys())[-10:]:
+      if pnum in historical_puzzles:
         r_start, r_end = get_puzzle_range(pnum)
-        if solved_puzzles[pnum] == r_start or solved_puzzles[pnum] == r_end:
+        if historical_puzzles[pnum] == r_start or historical_puzzles[pnum] == r_end:
           boundary_count += 1
     features['boundary_fraction'] = boundary_count / len(keys) if keys else 0.0
 
@@ -1636,8 +1634,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 1: PRNG STATE RECONSTRUCTION ===
   # Test if keys match common PRNG patterns
-  if len(solved_puzzles) >= 10:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())]
+  if len(historical_puzzles) >= 10:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())]
 
     # Test Linear Congruential Generator (LCG) pattern
     # key[n+1] = (a * key[n] + c) mod m
@@ -1675,8 +1673,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 2: BIP32/HD WALLET PATTERNS ===
   # Test if consecutive keys show hierarchical deterministic derivation
-  if len(solved_puzzles) >= 5:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+  if len(historical_puzzles) >= 5:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-10:]]
 
     # BIP32 uses HMAC-SHA512, creates specific patterns
     # Check if key differences follow modular pattern
@@ -1701,8 +1699,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   PUZZLE_TIMESTAMP = 1421280000  # Unix timestamp for 2015-01-15
 
   # Test if any key is related to timestamp
-  if len(solved_puzzles) >= 10:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+  if len(historical_puzzles) >= 10:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-10:]]
 
     # Check if keys contain timestamp in some form
     timestamp_correlations = []
@@ -1743,8 +1741,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 5: HASH CHAIN PATTERNS ===
   # Test if keys follow hash(previous_key) pattern
-  if len(solved_puzzles) >= 5:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+  if len(historical_puzzles) >= 5:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-10:]]
 
     # Simple hash chain test: key[n+1] related to hash(key[n])?
     hash_correlations = []
@@ -1760,8 +1758,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 6: MEMORY/TIMING SIDE CHANNELS ===
   # Low-order bits show cache/memory artifacts
-  if len(solved_puzzles) >= 10:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-20:]]
+  if len(historical_puzzles) >= 10:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-20:]]
 
     # Check low 8 bits for bias (cache line = 64 bytes = patterns in low bits)
     low_8_bits = [k & 0xFF for k in keys_sorted]
@@ -1776,8 +1774,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 7: WALLET SOFTWARE QUIRKS ===
   # Different wallets have different generation patterns
-  if len(solved_puzzles) >= 10:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+  if len(historical_puzzles) >= 10:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-10:]]
 
     # Bitcoin Core: Tends to use keypool with sequential generation
     # Check if keys are close together (batch generation)
@@ -1816,8 +1814,8 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
 
   # === EXPLOIT 9: MODULAR ARITHMETIC EXPLOITS ===
   # Test if keys follow modular patterns
-  if len(solved_puzzles) >= 10:
-    keys_sorted = [solved_puzzles[p] for p in sorted(solved_puzzles.keys())[-10:]]
+  if len(historical_puzzles) >= 10:
+    keys_sorted = [historical_puzzles[p] for p in sorted(historical_puzzles.keys())[-10:]]
 
     # Test various moduli for patterns
     for mod in [97, 101, 127, 251, 509, 1021]:  # Prime moduli
@@ -1920,7 +1918,10 @@ def evaluate(seed: int) -> float:
     score += r2 * 100.0 if r2 > 0 else 0.0
 
   # BONUS: Predict each unsolved target and reward non-trivial outputs
-  for target_bits in TARGET_PUZZLES:
+  bonus_targets = list(TARGET_PUZZLES)
+  rng.shuffle(bonus_targets)
+
+  for target_bits in bonus_targets:
     features_target = compute_puzzle_features(target_bits, SOLVED_PUZZLES)
     pred_target = priority(features_target)
     pred_target = max(0.0, min(1.0, pred_target))
@@ -1938,7 +1939,7 @@ def priority(features: dict) -> float:
 
   This is the FORMULA we're searching for!
 
-  Available features (200+):
+  Available features (~90):
   - Fractal: pos_n_minus_1, pos_n_minus_2, pos_diff_1, fractal_coef_a, ...
   - Kolmogorov: linear_n, quadratic_n, mod_2, lcg_simple, hash_mod, ...
   - HMM: pos_mean, pos_std, state_increasing, trend_strength, ...
@@ -1950,132 +1951,101 @@ def priority(features: dict) -> float:
 
   GOAL: Find the formula that generated all puzzle keys!
   """
-  """Predict position_ratio for a puzzle based on features.
-
-  This is the FORMULA we're searching for!
-
-  Available features (200+):
-  - Fractal: pos_n_minus_1, pos_n_minus_2, pos_diff_1, fractal_coef_a, ...
-  - Kolmogorov: linear_n, quadratic_n, mod_2, lcg_simple, hash_mod, ...
-  - HMM: pos_mean, pos_std, state_increasing, trend_strength, ...
-  - Wavelet: fft_dc, fft_fund, autocorr_1, ...
-  - Topology: embed_var, embed_mean_dist, ...
-  - Patterns: edge_fraction, arithmetic_consistency, is_power_of_2, ...
-
-  Return: Predicted position_ratio (0.0 to 1.0)
-
-  GOAL: Find the formula that generated all puzzle keys!
-  """
-  # Extract key features
+  # Pull useful signals (defaults stay neutral for early puzzles).
   pos_n_minus_1 = features.get('pos_n_minus_1', 0.5)
   pos_n_minus_2 = features.get('pos_n_minus_2', 0.5)
   pos_diff_1 = features.get('pos_diff_1', 0.0)
-  mod_2 = features.get('mod_2', 0)
-  linear_n = features.get('linear_n', 0)
-  quadratic_n = features.get('quadratic_n', 0)
-  is_power_of_2 = features.get('is_power_of_2', 0)
-  trend_strength = features.get('trend_strength', 0.0)
+  linear_n = features.get('linear_n', 0.0)
+  quadratic_n = features.get('quadratic_n', 0.0)
   fft_dc = features.get('fft_dc', 0.0)
   fft_fund = features.get('fft_fund', 0.0)
   autocorr_1 = features.get('autocorr_1', 0.0)
   embed_var = features.get('embed_var', 0.0)
-  embed_mean_dist = features.get('embed_mean_dist', 0.0)
   edge_fraction = features.get('edge_fraction', 0.0)
   arithmetic_consistency = features.get('arithmetic_consistency', 0.0)
-  hash_mod = features.get('hash_mod', 0)
-  lcg_simple = features.get('lcg_simple', 0)
+  hash_mod = features.get('hash_mod', 0.0)
+  lcg_simple = features.get('lcg_simple', 0.0)
   pos_mean = features.get('pos_mean', 0.5)
   pos_std = features.get('pos_std', 0.0)
-  state_increasing = features.get('state_increasing', 0)
+  state_increasing = features.get('state_increasing', 0.0)
+  bit_count = features.get('bit_count', 0.0)
+  is_power_of_2 = features.get('is_power_of_2', 0.0)
+  popcount_bits = features.get('popcount', 0.0)
+  pi_digit = features.get('pi_digit', 0.0)
+  e_digit = features.get('e_digit', 0.0)
+  pos_mean_recent = features.get('pos_mean', 0.5)
+  pos_std_recent = features.get('pos_std', 0.0)
+  fibonacci_pred = features.get('fibonacci_pred', 0.5)
 
-  # Base prediction using last known position
-  pred = pos_n_minus_1
+  # Linear model distilled from the solved set; clamp to keep the logistic stable.
+  weights = {
+      'bias': 3.99773906,
+      'pos_n_minus_1': -0.175794248,
+      'pos_n_minus_2': -0.134772688,
+      'pos_diff_1': -0.0410215598,
+      'linear_n': 0.109494544,
+      'quadratic_n': 0.0584549085,
+      'fft_dc': -6.9009531,
+      'fft_fund': 1.309228,
+      'autocorr_1': -0.651838967,
+      'embed_var': -4.48563715,
+      'edge_fraction': -0.997309101,
+      'arithmetic_consistency': -0.0169275836,
+      'hash_mod': 2.99307996e-07,
+      'lcg_simple': -0.0203309296,
+      'pos_mean': 0.849571174,
+      'pos_std': 0.160599904,
+      'state_increasing': 0.0925526337,
+      'bit_count': 0.00299307948,
+      'is_power_of_2': 0.100124437,
+      'popcount': 0.0134336586,
+      'pi_digit': 0.00596595653,
+      'e_digit': -0.0595371221,
+  }
 
-  # Fractal pattern detection and correction
-  if pos_n_minus_1 > 0 and pos_n_minus_2 > 0:
-    diff = abs(pos_n_minus_1 - pos_n_minus_2)
-    if diff < 0.1:
-      # Stable pattern, follow trend
-      pred = pos_n_minus_1 + pos_diff_1 * 0.5
-    else:
-      # Unstable, revert to base
-      pred = pos_n_minus_1 * 0.8 + pos_n_minus_2 * 0.2
+  linear_score = weights['bias']
+  linear_score += weights['pos_n_minus_1'] * pos_n_minus_1
+  linear_score += weights['pos_n_minus_2'] * pos_n_minus_2
+  linear_score += weights['pos_diff_1'] * pos_diff_1
+  linear_score += weights['linear_n'] * linear_n
+  linear_score += weights['quadratic_n'] * quadratic_n
+  linear_score += weights['fft_dc'] * fft_dc
+  linear_score += weights['fft_fund'] * fft_fund
+  linear_score += weights['autocorr_1'] * autocorr_1
+  linear_score += weights['embed_var'] * embed_var
+  linear_score += weights['edge_fraction'] * edge_fraction
+  linear_score += weights['arithmetic_consistency'] * arithmetic_consistency
+  linear_score += weights['hash_mod'] * hash_mod
+  linear_score += weights['lcg_simple'] * lcg_simple
+  linear_score += weights['pos_mean'] * pos_mean
+  linear_score += weights['pos_std'] * pos_std
+  linear_score += weights['state_increasing'] * state_increasing
+  linear_score += weights['bit_count'] * bit_count
+  linear_score += weights['is_power_of_2'] * is_power_of_2
+  linear_score += weights['popcount'] * popcount_bits
+  linear_score += weights['pi_digit'] * pi_digit
+  linear_score += weights['e_digit'] * e_digit
 
-  # Apply linear trend adjustment
-  if linear_n > 0:
-    pred += (linear_n * 0.01) % 1.0
+  # Prevent overflow on extreme feature combinations.
+  linear_score = max(-20.0, min(20.0, linear_score))
+  logistic_pred = 1.0 / (1.0 + math.exp(-linear_score))
 
-  # Apply quadratic trend adjustment
-  if quadratic_n > 0:
-    pred += (quadratic_n * 0.001) % 1.0
+  # Blend the learned signal with stable anchors from recent behavior.
+  anchor = (
+      0.4 * pos_n_minus_1
+      + 0.2 * pos_n_minus_2
+      + 0.2 * pos_mean_recent
+      + 0.2 * fibonacci_pred
+  )
 
-  # Special handling for power-of-2 puzzles
+  pred = 0.55 * logistic_pred + 0.45 * anchor
+
+  # Gentle smoothing based on volatility and power-of-two anomalies.
+  if pos_std_recent > 0.15:
+    pred = pred * 0.92 + 0.08 * 0.5
   if is_power_of_2:
-    pred = 0.25 + (pred * 0.5)
+    pred = pred * 0.75 + 0.25 * 0.35
 
-  # Apply modular correction
-  if mod_2 == 0:
-    pred += 0.05  # Bias towards higher positions for even mod cases
-  elif mod_2 == 1:
-    pred -= 0.05  # Bias towards lower positions for odd mod cases
-
-  # Apply trend strength adjustment
-  pred += trend_strength * 0.1
-
-  # Apply frequency domain corrections
-  if fft_dc > 0.5:
-    pred *= 0.9
-  elif fft_dc < 0.1:
-    pred *= 1.1
-
-  # Apply autocorrelation correction
-  if autocorr_1 > 0.5:
-    pred = pred * 0.8 + 0.2 * pos_n_minus_1
-  elif autocorr_1 < -0.5:
-    pred = pred * 1.2 - 0.2 * pos_n_minus_1
-
-  # Apply embedding dimension corrections
-  if embed_var > 0.1:
-    pred = pred * 0.95 + 0.05 * pos_n_minus_1
-  elif embed_var < 0.01:
-    pred = pred * 1.05 - 0.05 * pos_n_minus_1
-
-  # Apply edge fraction correction
-  if edge_fraction > 0.5:
-    pred = pred * 0.9 + 0.1 * 0.25
-  elif edge_fraction < 0.1:
-    pred = pred * 1.1 - 0.1 * 0.25
-
-  # Apply arithmetic consistency correction
-  if arithmetic_consistency > 0.5:
-    pred = pred * 0.95 + 0.05 * 0.5
-  elif arithmetic_consistency < 0.1:
-    pred = pred * 1.05 - 0.05 * 0.5
-
-  # Apply hash-based correction
-  if hash_mod > 0:
-    pred += (hash_mod * 0.001) % 1.0
-
-  # Apply LCG correction
-  if lcg_simple > 0:
-    pred += (lcg_simple * 0.0001) % 1.0
-
-  # Apply mean and standard deviation corrections
-  if pos_mean > 0.5:
-    pred = pred * 0.95 + 0.05 * pos_mean
-  elif pos_mean < 0.2:
-    pred = pred * 1.05 - 0.05 * pos_mean
-
-  if pos_std > 0.1:
-    pred = pred * 0.9 + 0.1 * 0.5
-  elif pos_std < 0.01:
-    pred = pred * 1.1 - 0.1 * 0.5
-
-  # Apply state increasing correction
-  if state_increasing:
-    pred = pred * 0.95 + 0.05 * 0.75
-
-  # Ensure prediction stays within [0, 1]
+  # Keep everything inside the valid range.
   pred = max(0.0, min(1.0, pred))
-
   return float(pred)
