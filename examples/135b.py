@@ -185,10 +185,10 @@ def compute_features(px, py, qx, qy):
   features['jacobi_qy'] = jacobi_symbol(qy, P)
 
   # === DIGIT SUMS (patterns in different bases) ===
-  features['digit_sum_x_b256'] = sum(int(d) for d in hex(px)[2:])
-  features['digit_sum_y_b256'] = sum(int(d) for d in hex(py)[2:])
-  features['digit_sum_qx_b256'] = sum(int(d) for d in hex(qx)[2:])
-  features['digit_sum_qy_b256'] = sum(int(d) for d in hex(qy)[2:])
+  features['digit_sum_x_b256'] = sum(int(d, 16) for d in hex(px)[2:])
+  features['digit_sum_y_b256'] = sum(int(d, 16) for d in hex(py)[2:])
+  features['digit_sum_qx_b256'] = sum(int(d, 16) for d in hex(qx)[2:])
+  features['digit_sum_qy_b256'] = sum(int(d, 16) for d in hex(qy)[2:])
 
   # === BIT PATTERNS AT DIFFERENT POSITIONS ===
   features['x_low_32_xor'] = (px ^ qx) & 0xFFFFFFFF
