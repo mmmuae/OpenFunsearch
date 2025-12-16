@@ -13,8 +13,29 @@ Mathematical Methods Combined:
 4. Wavelet Phase Space Reconstruction - Frequency domain patterns
 5. Topological Data Analysis - Shape of position manifold
 
+Math/toolbox inspirations (names only; be inventive)
+- Number theory (modular structure, continued fractions, CRT)
+- Dynamical systems & chaos, symbolic dynamics, ergodic ideas
+- Information theory / MDL (Minimum Description Length), algorithmic complexity
+- Spectral & harmonic analysis (Fourier intuition, phase cues), wavelets
+- Robust statistics (trimmed means, Huber-like behavior), rank statistics
+- Bayesian model averaging (as inspiration for blending)
+- Manifold/geometry intuition, topological viewpoints (shape of data)
+- Kernel methods intuition (smoothness, locality)
+- Automata/state-machine intuition (regime switching)
+
 FunSearch Mission: Discover which mathematical transformation predicts
   the position pattern across all puzzles.
+
+What you are allowed to do
+- Use ANY combination of available features.
+- Create derived features internally:
+  differences, ratios (with safeguards), logs/sqrt, powers, z-scores,
+  interactions (f*g), simple recurrences using “history-like” signals,
+  smooth nonlinearities (tanh-like / sigmoid-like approximations),
+  and mixtures/blends of sub-predictors.
+- You may gate between 2–4 “regimes” (piecewise rules), but keep gating
+  minimal and avoid brittle threshold cascades.
 
 Guidelines for the LLM:
 - **DISCOVER THE FORMULA**: The priority function should return a predicted
@@ -2063,4 +2084,16 @@ def priority(features: dict) -> float:
   # Ensure prediction stays within [0, 1]
   pred = max(0.0, min(1.0, pred))
 
+  # Add a new pattern: use transcendental constants to predict
+  # This assumes that the puzzle positions are somehow encoded in PI or E
+  n = features.get('n', 0)
+  if n < len(PI_DIGITS):
+    pi_digit = int(PI_DIGITS[n])
+    e_digit = int(E_DIGITS[n]) if n < len(E_DIGITS) else 0
+    # Combine digits to form a fraction
+    combined_digit = (pi_digit + e_digit) % 10
+    # Normalize to [0, 1]
+    pred = (pred + combined_digit / 10.0) / 2.0
+
   return float(pred)
+
