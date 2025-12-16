@@ -1951,101 +1951,116 @@ def priority(features: dict) -> float:
 
   GOAL: Find the formula that generated all puzzle keys!
   """
-  # Pull useful signals (defaults stay neutral for early puzzles).
+  # Extract key features
   pos_n_minus_1 = features.get('pos_n_minus_1', 0.5)
   pos_n_minus_2 = features.get('pos_n_minus_2', 0.5)
   pos_diff_1 = features.get('pos_diff_1', 0.0)
-  linear_n = features.get('linear_n', 0.0)
-  quadratic_n = features.get('quadratic_n', 0.0)
+  mod_2 = features.get('mod_2', 0)
+  linear_n = features.get('linear_n', 0)
+  quadratic_n = features.get('quadratic_n', 0)
+  is_power_of_2 = features.get('is_power_of_2', 0)
+  trend_strength = features.get('trend_strength', 0.0)
   fft_dc = features.get('fft_dc', 0.0)
   fft_fund = features.get('fft_fund', 0.0)
   autocorr_1 = features.get('autocorr_1', 0.0)
   embed_var = features.get('embed_var', 0.0)
+  embed_mean_dist = features.get('embed_mean_dist', 0.0)
   edge_fraction = features.get('edge_fraction', 0.0)
   arithmetic_consistency = features.get('arithmetic_consistency', 0.0)
-  hash_mod = features.get('hash_mod', 0.0)
-  lcg_simple = features.get('lcg_simple', 0.0)
+  hash_mod = features.get('hash_mod', 0)
+  lcg_simple = features.get('lcg_simple', 0)
   pos_mean = features.get('pos_mean', 0.5)
   pos_std = features.get('pos_std', 0.0)
-  state_increasing = features.get('state_increasing', 0.0)
-  bit_count = features.get('bit_count', 0.0)
-  is_power_of_2 = features.get('is_power_of_2', 0.0)
-  popcount_bits = features.get('popcount', 0.0)
-  pi_digit = features.get('pi_digit', 0.0)
-  e_digit = features.get('e_digit', 0.0)
-  pos_mean_recent = features.get('pos_mean', 0.5)
-  pos_std_recent = features.get('pos_std', 0.0)
-  fibonacci_pred = features.get('fibonacci_pred', 0.5)
+  state_increasing = features.get('state_increasing', 0)
 
-  # Linear model distilled from the solved set; clamp to keep the logistic stable.
-  weights = {
-      'bias': 3.99773906,
-      'pos_n_minus_1': -0.175794248,
-      'pos_n_minus_2': -0.134772688,
-      'pos_diff_1': -0.0410215598,
-      'linear_n': 0.109494544,
-      'quadratic_n': 0.0584549085,
-      'fft_dc': -6.9009531,
-      'fft_fund': 1.309228,
-      'autocorr_1': -0.651838967,
-      'embed_var': -4.48563715,
-      'edge_fraction': -0.997309101,
-      'arithmetic_consistency': -0.0169275836,
-      'hash_mod': 2.99307996e-07,
-      'lcg_simple': -0.0203309296,
-      'pos_mean': 0.849571174,
-      'pos_std': 0.160599904,
-      'state_increasing': 0.0925526337,
-      'bit_count': 0.00299307948,
-      'is_power_of_2': 0.100124437,
-      'popcount': 0.0134336586,
-      'pi_digit': 0.00596595653,
-      'e_digit': -0.0595371221,
-  }
+  # Base prediction using last known position
+  pred = pos_n_minus_1
 
-  linear_score = weights['bias']
-  linear_score += weights['pos_n_minus_1'] * pos_n_minus_1
-  linear_score += weights['pos_n_minus_2'] * pos_n_minus_2
-  linear_score += weights['pos_diff_1'] * pos_diff_1
-  linear_score += weights['linear_n'] * linear_n
-  linear_score += weights['quadratic_n'] * quadratic_n
-  linear_score += weights['fft_dc'] * fft_dc
-  linear_score += weights['fft_fund'] * fft_fund
-  linear_score += weights['autocorr_1'] * autocorr_1
-  linear_score += weights['embed_var'] * embed_var
-  linear_score += weights['edge_fraction'] * edge_fraction
-  linear_score += weights['arithmetic_consistency'] * arithmetic_consistency
-  linear_score += weights['hash_mod'] * hash_mod
-  linear_score += weights['lcg_simple'] * lcg_simple
-  linear_score += weights['pos_mean'] * pos_mean
-  linear_score += weights['pos_std'] * pos_std
-  linear_score += weights['state_increasing'] * state_increasing
-  linear_score += weights['bit_count'] * bit_count
-  linear_score += weights['is_power_of_2'] * is_power_of_2
-  linear_score += weights['popcount'] * popcount_bits
-  linear_score += weights['pi_digit'] * pi_digit
-  linear_score += weights['e_digit'] * e_digit
+  # Fractal pattern detection and correction
+  if pos_n_minus_1 > 0 and pos_n_minus_2 > 0:
+    diff = abs(pos_n_minus_1 - pos_n_minus_2)
+    if diff < 0.1:
+      # Stable pattern, follow trend
+      pred = pos_n_minus_1 + pos_diff_1 * 0.5
+    else:
+      # Unstable, revert to base
+      pred = pos_n_minus_1 * 0.8 + pos_n_minus_2 * 0.2
 
-  # Prevent overflow on extreme feature combinations.
-  linear_score = max(-20.0, min(20.0, linear_score))
-  logistic_pred = 1.0 / (1.0 + math.exp(-linear_score))
+  # Apply linear trend adjustment
+  if linear_n > 0:
+    pred += (linear_n * 0.01) % 1.0
 
-  # Blend the learned signal with stable anchors from recent behavior.
-  anchor = (
-      0.4 * pos_n_minus_1
-      + 0.2 * pos_n_minus_2
-      + 0.2 * pos_mean_recent
-      + 0.2 * fibonacci_pred
-  )
+  # Apply quadratic trend adjustment
+  if quadratic_n > 0:
+    pred += (quadratic_n * 0.001) % 1.0
 
-  pred = 0.55 * logistic_pred + 0.45 * anchor
-
-  # Gentle smoothing based on volatility and power-of-two anomalies.
-  if pos_std_recent > 0.15:
-    pred = pred * 0.92 + 0.08 * 0.5
+  # Special handling for power-of-2 puzzles
   if is_power_of_2:
-    pred = pred * 0.75 + 0.25 * 0.35
+    pred = 0.25 + (pred * 0.5)
 
-  # Keep everything inside the valid range.
+  # Apply modular correction
+  if mod_2 == 0:
+    pred += 0.05  # Bias towards higher positions for even mod cases
+  elif mod_2 == 1:
+    pred -= 0.05  # Bias towards lower positions for odd mod cases
+
+  # Apply trend strength adjustment
+  pred += trend_strength * 0.1
+
+  # Apply frequency domain corrections
+  if fft_dc > 0.5:
+    pred *= 0.9
+  elif fft_dc < 0.1:
+    pred *= 1.1
+
+  # Apply autocorrelation correction
+  if autocorr_1 > 0.5:
+    pred = pred * 0.8 + 0.2 * pos_n_minus_1
+  elif autocorr_1 < -0.5:
+    pred = pred * 1.2 - 0.2 * pos_n_minus_1
+
+  # Apply embedding dimension corrections
+  if embed_var > 0.1:
+    pred = pred * 0.95 + 0.05 * pos_n_minus_1
+  elif embed_var < 0.01:
+    pred = pred * 1.05 - 0.05 * pos_n_minus_1
+
+  # Apply edge fraction correction
+  if edge_fraction > 0.5:
+    pred = pred * 0.9 + 0.1 * 0.25
+  elif edge_fraction < 0.1:
+    pred = pred * 1.1 - 0.1 * 0.25
+
+  # Apply arithmetic consistency correction
+  if arithmetic_consistency > 0.5:
+    pred = pred * 0.95 + 0.05 * 0.5
+  elif arithmetic_consistency < 0.1:
+    pred = pred * 1.05 - 0.05 * 0.5
+
+  # Apply hash-based correction
+  if hash_mod > 0:
+    pred += (hash_mod * 0.001) % 1.0
+
+  # Apply LCG correction
+  if lcg_simple > 0:
+    pred += (lcg_simple * 0.0001) % 1.0
+
+  # Apply mean and standard deviation corrections
+  if pos_mean > 0.5:
+    pred = pred * 0.95 + 0.05 * pos_mean
+  elif pos_mean < 0.2:
+    pred = pred * 1.05 - 0.05 * pos_mean
+
+  if pos_std > 0.1:
+    pred = pred * 0.9 + 0.1 * 0.5
+  elif pos_std < 0.01:
+    pred = pred * 1.1 - 0.1 * 0.5
+
+  # Apply state increasing correction
+  if state_increasing:
+    pred = pred * 0.95 + 0.05 * 0.75
+
+  # Ensure prediction stays within [0, 1]
   pred = max(0.0, min(1.0, pred))
+
   return float(pred)
