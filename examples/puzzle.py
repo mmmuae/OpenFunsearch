@@ -647,6 +647,487 @@ def _embedded_raw_puzzle_data():
 RAW_PUZZLE_DATA = _embedded_raw_puzzle_data()
 
 
+# ==============================================================================
+# UNSOLVED BITCOIN PUZZLES
+# ==============================================================================
+
+# Unsolved puzzle metadata is kept separate so targets can be iterated without
+# mutating the solved dataset. Public keys are included when known (e.g., Puzzle
+# 135) so that feature calculations can leverage them, while puzzles without a
+# revealed public key are explicitly marked.
+def _embedded_unsolved_puzzle_data():
+  return [{'address': '1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU',
+    'bits': 71,
+    'hash160_compressed': 'f6f5431d25bbf7b12e8add9af5e3475c44a0a5b8',
+    'public_key': None,
+    'range_max': 2361183241434822606847,
+    'range_min': 1180591620717411303424},
+   {'address': '1JTK7s9YVYywfm5XUH7RNhHJH1LshCaRFR',
+    'bits': 72,
+    'hash160_compressed': 'bf7413e8df4e7a34ce9dc13e2f2648783ec54adb',
+    'public_key': None,
+    'range_max': 4722366482869645213695,
+    'range_min': 2361183241434822606848},
+   {'address': '12VVRNPi4SJqUTsp6FmqDqY5sGosDtysn4',
+    'bits': 73,
+    'hash160_compressed': '105b7f253f0ebd7843adaebbd805c944bfb863e4',
+    'public_key': None,
+    'range_max': 9444732965739290427391,
+    'range_min': 4722366482869645213696},
+   {'address': '1FWGcVDK3JGzCC3WtkYetULPszMaK2Jksv',
+    'bits': 74,
+    'hash160_compressed': '9f1adb20baeacc38b3f49f3df6906a0e48f2df3d',
+    'public_key': None,
+    'range_max': 18889465931478580854783,
+    'range_min': 9444732965739290427392},
+   {'address': '1DJh2eHFYQfACPmrvpyWc8MSTYKh7w9eRF',
+    'bits': 76,
+    'hash160_compressed': '86f9fea5cdecf033161dd2f8f8560768ae0a6d14',
+    'public_key': None,
+    'range_max': 75557863725914323419135,
+    'range_min': 37778931862957161709568},
+   {'address': '1Bxk4CQdqL9p22JEtDfdXMsng1XacifUtE',
+    'bits': 77,
+    'hash160_compressed': '783c138ac81f6a52398564bb17455576e8525b29',
+    'public_key': None,
+    'range_max': 151115727451828646838271,
+    'range_min': 75557863725914323419136},
+   {'address': '15qF6X51huDjqTmF9BJgxXdt1xcj46Jmhb',
+    'bits': 78,
+    'hash160_compressed': '35003c3ef8759c92092f8488fca59a042859018c',
+    'public_key': None,
+    'range_max': 302231454903657293676543,
+    'range_min': 151115727451828646838272},
+   {'address': '1ARk8HWJMn8js8tQmGUJeQHjSE7KRkn2t8',
+    'bits': 79,
+    'hash160_compressed': '67671d5490c272e3ab7ddd34030d587738df33da',
+    'public_key': None,
+    'range_max': 604462909807314587353087,
+    'range_min': 302231454903657293676544},
+   {'address': '15qsCm78whspNQFydGJQk5rexzxTQopnHZ',
+    'bits': 81,
+    'hash160_compressed': '351e605fac813965951ba433b7c2956bf8ad95ce',
+    'public_key': None,
+    'range_max': 2417851639229258349412351,
+    'range_min': 1208925819614629174706176},
+   {'address': '13zYrYhhJxp6Ui1VV7pqa5WDhNWM45ARAC',
+    'bits': 82,
+    'hash160_compressed': '20d28d4e87543947c7e4913bcdceaa16e2f8f061',
+    'public_key': None,
+    'range_max': 4835703278458516698824703,
+    'range_min': 2417851639229258349412352},
+   {'address': '14MdEb4eFcT3MVG5sPFG4jGLuHJSnt1Dk2',
+    'bits': 83,
+    'hash160_compressed': '24cef184714bbd030833904f5265c9c3e12a95a2',
+    'public_key': None,
+    'range_max': 9671406556917033397649407,
+    'range_min': 4835703278458516698824704},
+   {'address': '1CMq3SvFcVEcpLMuuH8PUcNiqsK1oicG2D',
+    'bits': 84,
+    'hash160_compressed': '7c99ce73e19f9fbfcce4825ae88261e2b0b0b040',
+    'public_key': None,
+    'range_max': 19342813113834066795298815,
+    'range_min': 9671406556917033397649408},
+   {'address': '1K3x5L6G57Y494fDqBfrojD28UJv4s5JcK',
+    'bits': 86,
+    'hash160_compressed': 'c60111ed3d63b49665747b0e31eb382da5193535',
+    'public_key': None,
+    'range_max': 77371252455336267181195263,
+    'range_min': 38685626227668133590597632},
+   {'address': '1PxH3K1Shdjb7gSEoTX7UPDZ6SH4qGPrvq',
+    'bits': 87,
+    'hash160_compressed': 'fbc708d671c03e26661b9c08f77598a529858b5e',
+    'public_key': None,
+    'range_max': 154742504910672534362390527,
+    'range_min': 77371252455336267181195264},
+   {'address': '16AbnZjZZipwHMkYKBSfswGWKDmXHjEpSf',
+    'bits': 88,
+    'hash160_compressed': '38a968fdfb457654c51bcfc4f9174d6ee487bb41',
+    'public_key': None,
+    'range_max': 309485009821345068724781055,
+    'range_min': 154742504910672534362390528},
+   {'address': '19QciEHbGVNY4hrhfKXmcBBCrJSBZ6TaVt',
+    'bits': 89,
+    'hash160_compressed': '5c3862203d1e44ab3af441503e22db97b1c5097e',
+    'public_key': None,
+    'range_max': 618970019642690137449562111,
+    'range_min': 309485009821345068724781056},
+   {'address': '1EzVHtmbN4fs4MiNk3ppEnKKhsmXYJ4s74',
+    'bits': 91,
+    'hash160_compressed': '9978f61b92d16c5f1a463a0995df70da1f7a7d2a',
+    'public_key': None,
+    'range_max': 2475880078570760549798248447,
+    'range_min': 1237940039285380274899124224},
+   {'address': '1AE8NzzgKE7Yhz7BWtAcAAxiFMbPo82NB5',
+    'bits': 92,
+    'hash160_compressed': '6534b31208fe6e100d29f9c9c75aac8bf06fbb38',
+    'public_key': None,
+    'range_max': 4951760157141521099596496895,
+    'range_min': 2475880078570760549798248448},
+   {'address': '17Q7tuG2JwFFU9rXVj3uZqRtioH3mx2Jad',
+    'bits': 93,
+    'hash160_compressed': '463013cd41279f2fd0c31d0a16db3972bfffac8d',
+    'public_key': None,
+    'range_max': 9903520314283042199192993791,
+    'range_min': 4951760157141521099596496896},
+   {'address': '1K6xGMUbs6ZTXBnhw1pippqwK6wjBWtNpL',
+    'bits': 94,
+    'hash160_compressed': 'c6927a00970d0165327d0a6db7950f05720c295c',
+    'public_key': None,
+    'range_max': 19807040628566084398385987583,
+    'range_min': 9903520314283042199192993792},
+   {'address': '15ANYzzCp5BFHcCnVFzXqyibpzgPLWaD8b',
+    'bits': 96,
+    'hash160_compressed': '2da63cbd251d23c7b633cb287c09e6cf888b3fe4',
+    'public_key': None,
+    'range_max': 79228162514264337593543950335,
+    'range_min': 39614081257132168796771975168},
+   {'address': '18ywPwj39nGjqBrQJSzZVq2izR12MDpDr8',
+    'bits': 97,
+    'hash160_compressed': '578d94dc6f40fff35f91f6fba9b71c46b361dff2',
+    'public_key': None,
+    'range_max': 158456325028528675187087900671,
+    'range_min': 79228162514264337593543950336},
+   {'address': '1CaBVPrwUxbQYYswu32w7Mj4HR4maNoJSX',
+    'bits': 98,
+    'hash160_compressed': '7eefddd979a1d6bb6f29757a1f463579770ba566',
+    'public_key': None,
+    'range_max': 316912650057057350374175801343,
+    'range_min': 158456325028528675187087900672},
+   {'address': '1JWnE6p6UN7ZJBN7TtcbNDoRcjFtuDWoNL',
+    'bits': 99,
+    'hash160_compressed': 'c01bf430a97cbcdaedddba87ef4ea21c456cebdb',
+    'public_key': None,
+    'range_max': 633825300114114700748351602687,
+    'range_min': 316912650057057350374175801344},
+   {'address': '1CKCVdbDJasYmhswB6HKZHEAnNaDpK7W4n',
+    'bits': 101,
+    'hash160_compressed': '7c1a77205c03b9909663b2034faa0b544e6bc96b',
+    'public_key': None,
+    'range_max': 2535301200456458802993406410751,
+    'range_min': 1267650600228229401496703205376},
+   {'address': '1PXv28YxmYMaB8zxrKeZBW8dt2HK7RkRPX',
+    'bits': 102,
+    'hash160_compressed': 'f72b812932f6d7102233971d65cec0a22b89e136',
+    'public_key': None,
+    'range_max': 5070602400912917605986812821503,
+    'range_min': 2535301200456458802993406410752},
+   {'address': '1AcAmB6jmtU6AiEcXkmiNE9TNVPsj9DULf',
+    'bits': 103,
+    'hash160_compressed': '695fd6dcf33f47166b25de968b2932b351b0afc4',
+    'public_key': None,
+    'range_max': 10141204801825835211973625643007,
+    'range_min': 5070602400912917605986812821504},
+   {'address': '1EQJvpsmhazYCcKX5Au6AZmZKRnzarMVZu',
+    'bits': 104,
+    'hash160_compressed': '93022af9a38f3ebb0c3f15dd1c83f8fadaf64e74',
+    'public_key': None,
+    'range_max': 20282409603651670423947251286015,
+    'range_min': 10141204801825835211973625643008},
+   {'address': '18KsfuHuzQaBTNLASyj15hy4LuqPUo1FNB',
+    'bits': 106,
+    'hash160_compressed': '505aaa63a5e209dfb90cee683a8e227a8c278e47',
+    'public_key': None,
+    'range_max': 81129638414606681695789005144063,
+    'range_min': 40564819207303340847894502572032},
+   {'address': '15EJFC5ZTs9nhsdvSUeBXjLAuYq3SWaxTc',
+    'bits': 107,
+    'hash160_compressed': '2e644e46b042ffa86da35c54d7275f1abe6d4911',
+    'public_key': None,
+    'range_max': 162259276829213363391578010288127,
+    'range_min': 81129638414606681695789005144064},
+   {'address': '1HB1iKUqeffnVsvQsbpC6dNi1XKbyNuqao',
+    'bits': 108,
+    'hash160_compressed': 'b166c44f12c7fc565f37ff6288ee64e0f0ec9a0b',
+    'public_key': None,
+    'range_max': 324518553658426726783156020576255,
+    'range_min': 162259276829213363391578010288128},
+   {'address': '1GvgAXVCbA8FBjXfWiAms4ytFeJcKsoyhL',
+    'bits': 109,
+    'hash160_compressed': 'aeb0a0197442d4ade8ef41442d557b0e22b85ac0',
+    'public_key': None,
+    'range_max': 649037107316853453566312041152511,
+    'range_min': 324518553658426726783156020576256},
+   {'address': '1824ZJQ7nKJ9QFTRBqn7z7dHV5EGpzUpH3',
+    'bits': 111,
+    'hash160_compressed': '4cfc43fe12a330c8164251e38c0c0c3c84cf86f6',
+    'public_key': None,
+    'range_max': 2596148429267413814265248164610047,
+    'range_min': 1298074214633706907132624082305024},
+   {'address': '18A7NA9FTsnJxWgkoFfPAFbQzuQxpRtCos',
+    'bits': 112,
+    'hash160_compressed': '4e81efec43c5195aeca0e3877664330418b8e48e',
+    'public_key': None,
+    'range_max': 5192296858534827628530496329220095,
+    'range_min': 2596148429267413814265248164610048},
+   {'address': '1NeGn21dUDDeqFQ63xb2SpgUuXuBLA4WT4',
+    'bits': 113,
+    'hash160_compressed': 'ed673389e4b12925316f9166d56d701829e53cf8',
+    'public_key': None,
+    'range_max': 10384593717069655257060992658440191,
+    'range_min': 5192296858534827628530496329220096},
+   {'address': '174SNxfqpdMGYy5YQcfLbSTK3MRNZEePoy',
+    'bits': 114,
+    'hash160_compressed': '42773005f9594cd16b10985d428418acb7f352ec',
+    'public_key': None,
+    'range_max': 20769187434139310514121985316880383,
+    'range_min': 10384593717069655257060992658440192},
+   {'address': '1MnJ6hdhvK37VLmqcdEwqC3iFxyWH2PHUV',
+    'bits': 116,
+    'hash160_compressed': 'e3f381c34a20da049779b44cae0417c7fb2898d0',
+    'public_key': None,
+    'range_max': 83076749736557242056487941267521535,
+    'range_min': 41538374868278621028243970633760768},
+   {'address': '1KNRfGWw7Q9Rmwsc6NT5zsdvEb9M2Wkj5Z',
+    'bits': 117,
+    'hash160_compressed': 'c97f9591e28687be1c4d972e25be7c372a3221b4',
+    'public_key': None,
+    'range_max': 166153499473114484112975882535043071,
+    'range_min': 83076749736557242056487941267521536},
+   {'address': '1PJZPzvGX19a7twf5HyD2VvNiPdHLzm9F6',
+    'bits': 118,
+    'hash160_compressed': 'f4a4e1c11a5bbbd2fc139d221825407c66e0b8b4',
+    'public_key': None,
+    'range_max': 332306998946228968225951765070086143,
+    'range_min': 166153499473114484112975882535043072},
+   {'address': '1GuBBhf61rnvRe4K8zu8vdQB3kHzwFqSy7',
+    'bits': 119,
+    'hash160_compressed': 'ae6804b35c82f47f8b0a42d8c5e514fe5ef0a883',
+    'public_key': None,
+    'range_max': 664613997892457936451903530140172287,
+    'range_min': 332306998946228968225951765070086144},
+   {'address': '1GDSuiThEV64c166LUFC9uDcVdGjqkxKyh',
+    'bits': 121,
+    'hash160_compressed': 'a6e4818537e42f7b3f021daa810367dad4dda16f',
+    'public_key': None,
+    'range_max': 2658455991569831745807614120560689151,
+    'range_min': 1329227995784915872903807060280344576},
+   {'address': '1Me3ASYt5JCTAK2XaC32RMeH34PdprrfDx',
+    'bits': 122,
+    'hash160_compressed': 'e263b62ea294b9650615a13b926e75944c823990',
+    'public_key': None,
+    'range_max': 5316911983139663491615228241121378303,
+    'range_min': 2658455991569831745807614120560689152},
+   {'address': '1CdufMQL892A69KXgv6UNBD17ywWqYpKut',
+    'bits': 123,
+    'hash160_compressed': '7fa4515066ba6905f894b2078f9af7b1379169cf',
+    'public_key': None,
+    'range_max': 10633823966279326983230456482242756607,
+    'range_min': 5316911983139663491615228241121378304},
+   {'address': '1BkkGsX9ZM6iwL3zbqs7HWBV7SvosR6m8N',
+    'bits': 124,
+    'hash160_compressed': '75f74467ce7214f1767406d5ed12012aa523c48e',
+    'public_key': None,
+    'range_max': 21267647932558653966460912964485513215,
+    'range_min': 10633823966279326983230456482242756608},
+   {'address': '1AWCLZAjKbV1P7AHvaPNCKiB7ZWVDMxFiz',
+    'bits': 126,
+    'hash160_compressed': '683ea8a1ef06eada90556017d44323b5c04e00f1',
+    'public_key': None,
+    'range_max': 85070591730234615865843651857942052863,
+    'range_min': 42535295865117307932921825928971026432},
+   {'address': '1G6EFyBRU86sThN3SSt3GrHu1sA7w7nzi4',
+    'bits': 127,
+    'hash160_compressed': 'a58708aa98ad35c889bb36d8049bf9e9cacfd02a',
+    'public_key': None,
+    'range_max': 170141183460469231731687303715884105727,
+    'range_min': 85070591730234615865843651857942052864},
+   {'address': '1MZ2L1gFrCtkkn6DnTT2e4PFUTHw9gNwaj',
+    'bits': 128,
+    'hash160_compressed': 'e170ef514689d7230da362a0c121a07723550512',
+    'public_key': None,
+    'range_max': 340282366920938463463374607431768211455,
+    'range_min': 170141183460469231731687303715884105728},
+   {'address': '1Hz3uv3nNZzBVMXLGadCucgjiCs5W9vaGz',
+    'bits': 129,
+    'hash160_compressed': 'ba4c2748360a6b66263e11d1dc8658463ca5ff18',
+    'public_key': None,
+    'range_max': 680564733841876926926749214863536422911,
+    'range_min': 340282366920938463463374607431768211456},
+   {'address': '16zRPnT8znwq42q7XeMkZUhb1bKqgRogyy',
+    'bits': 131,
+    'hash160_compressed': '41b4b36a6c036568972380177eca2916cacd71de',
+    'public_key': None,
+    'range_max': 2722258935367507707706996859454145691647,
+    'range_min': 1361129467683753853853498429727072845824},
+   {'address': '1KrU4dHE5WrW8rhWDsTRjR21r8t3dsrS3R',
+    'bits': 132,
+    'hash160_compressed': 'cecd3ca4319651bd3afd1e23ab66e111ed38d16d',
+    'public_key': None,
+    'range_max': 5444517870735015415413993718908291383295,
+    'range_min': 2722258935367507707706996859454145691648},
+   {'address': '17uDfp5r4n441xkgLFmhNoSW1KWp6xVLD',
+    'bits': 133,
+    'hash160_compressed': '014e15e4ea6da460cc7835e262676baa37988e4f',
+    'public_key': None,
+    'range_max': 10889035741470030830827987437816582766591,
+    'range_min': 5444517870735015415413993718908291383296},
+   {'address': '13A3JrvXmvg5w9XGvyyR4JEJqiLz8ZySY3',
+    'bits': 134,
+    'hash160_compressed': '17a5ebfaf62e73f149e33ba674836801f13a80b9',
+    'public_key': None,
+    'range_max': 21778071482940061661655974875633165533183,
+    'range_min': 10889035741470030830827987437816582766592},
+   {'address': '16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v',
+    'bits': 135,
+    'hash160_compressed': '3b6f58a75a54bfd85d1bc6c51180fdc732992326',
+    'public_key': '02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16',
+    'range_max': 43556142965880123323311949751266331066367,
+    'range_min': 21778071482940061661655974875633165533184},
+   {'address': '1UDHPdovvR985NrWSkdWQDEQ1xuRiTALq',
+    'bits': 136,
+    'hash160_compressed': '05257be4b57ee43fc09762d5d3a9ad4a6e1a0364',
+    'public_key': None,
+    'range_max': 87112285931760246646623899502532662132735,
+    'range_min': 43556142965880123323311949751266331066368},
+   {'address': '15nf31J46iLuK1ZkTnqHo7WgN5cARFK3RA',
+    'bits': 137,
+    'hash160_compressed': '3482f8986e13c018692053a784481c63a3554c9c',
+    'public_key': None,
+    'range_max': 174224571863520493293247799005065324265471,
+    'range_min': 87112285931760246646623899502532662132736},
+   {'address': '1Ab4vzG6wEQBDNQM1B2bvUz4fqXXdFk2WT',
+    'bits': 138,
+    'hash160_compressed': '692a8e583866fc9056f5c61a45969fb9d868a08c',
+    'public_key': None,
+    'range_max': 348449143727040986586495598010130648530943,
+    'range_min': 174224571863520493293247799005065324265472},
+   {'address': '1Fz63c775VV9fNyj25d9Xfw3YHE6sKCxbt',
+    'bits': 139,
+    'hash160_compressed': 'a45dae9cd5d3fde21e5aa9a95367d107267b3b8a',
+    'public_key': None,
+    'range_max': 696898287454081973172991196020261297061887,
+    'range_min': 348449143727040986586495598010130648530944},
+   {'address': '1QKBaU6WAeycb3DbKbLBkX7vJiaS8r42Xo',
+    'bits': 140,
+    'hash160_compressed': 'ffbb35a7bb9bbe16c1aa2534f7ff11d59c8e3d1a',
+    'public_key': '031f6a332d3c5c4f2de2378c012f429cd109ba07d69690c6c701b6bb87860d6640',
+    'range_max': 1393796574908163946345982392040522594123775,
+    'range_min': 696898287454081973172991196020261297061888},
+   {'address': '1CD91Vm97mLQvXhrnoMChhJx4TP9MaQkJo',
+    'bits': 141,
+    'hash160_compressed': '7af50f73fd580f1713af3a6f9c5de49643ec6fc6',
+    'public_key': None,
+    'range_max': 2787593149816327892691964784081045188247551,
+    'range_min': 1393796574908163946345982392040522594123776},
+   {'address': '15MnK2jXPqTMURX4xC3h4mAZxyCcaWWEDD',
+    'bits': 142,
+    'hash160_compressed': '2fcea55e6d027a2ba7c7ebe95eedf47766730fe2',
+    'public_key': None,
+    'range_max': 5575186299632655785383929568162090376495103,
+    'range_min': 2787593149816327892691964784081045188247552},
+   {'address': '13N66gCzWWHEZBxhVxG18P8wyjEWF9Yoi1',
+    'bits': 143,
+    'hash160_compressed': '19ed3e03d19ddcedd5fa86543be820b3a7951650',
+    'public_key': None,
+    'range_max': 11150372599265311570767859136324180752990207,
+    'range_min': 5575186299632655785383929568162090376495104},
+   {'address': '1NevxKDYuDcCh1ZMMi6ftmWwGrZKC6j7Ux',
+    'bits': 144,
+    'hash160_compressed': 'ed87120066e244ff5331d5f8625873d7a3acc39c',
+    'public_key': None,
+    'range_max': 22300745198530623141535718272648361505980415,
+    'range_min': 11150372599265311570767859136324180752990208},
+   {'address': '19GpszRNUej5yYqxXoLnbZWKew3KdVLkXg',
+    'bits': 145,
+    'hash160_compressed': '5abf369388deb8072741b4eb43ef10fa9388a729',
+    'public_key': '03afdda497369e219a2c1c369954a930e4d3740968e5e4352475bcffce3140dae5',
+    'range_max': 44601490397061246283071436545296723011960831,
+    'range_min': 22300745198530623141535718272648361505980416},
+   {'address': '1M7ipcdYHey2Y5RZM34MBbpugghmjaV89P',
+    'bits': 146,
+    'hash160_compressed': 'dca7ebfb78ce21884300f133d89244bc4b1b756f',
+    'public_key': None,
+    'range_max': 89202980794122492566142873090593446023921663,
+    'range_min': 44601490397061246283071436545296723011960832},
+   {'address': '18aNhurEAJsw6BAgtANpexk5ob1aGTwSeL',
+    'bits': 147,
+    'hash160_compressed': '5318b9d7fcc93873f768725eb68ba2c924bb07ee',
+    'public_key': None,
+    'range_max': 178405961588244985132285746181186892047843327,
+    'range_min': 89202980794122492566142873090593446023921664},
+   {'address': '1FwZXt6EpRT7Fkndzv6K4b4DFoT4trbMrV',
+    'bits': 148,
+    'hash160_compressed': 'a3e3612e586fd206efb8eee6ccd58318e182829a',
+    'public_key': None,
+    'range_max': 356811923176489970264571492362373784095686655,
+    'range_min': 178405961588244985132285746181186892047843328},
+   {'address': '1CXvTzR6qv8wJ7eprzUKeWxyGcHwDYP1i2',
+    'bits': 149,
+    'hash160_compressed': '7e827e3b90da24c2a15f7b67e3bbece39955a5d0',
+    'public_key': None,
+    'range_max': 713623846352979940529142984724747568191373311,
+    'range_min': 356811923176489970264571492362373784095686656},
+   {'address': '1MUJSJYtGPVGkBCTqGspnxyHahpt5Te8jy',
+    'bits': 150,
+    'hash160_compressed': 'e08c4d3bc9cf2b3e2cb88de2bfaa4fe8c7aa3f24',
+    'public_key': '03137807790ea7dc6e97901c2bc87411f45ed74a5629315c4e4b03a0a102250c49',
+    'range_max': 1427247692705959881058285969449495136382746623,
+    'range_min': 713623846352979940529142984724747568191373312},
+   {'address': '13Q84TNNvgcL3HJiqQPvyBb9m4hxjS3jkV',
+    'bits': 151,
+    'hash160_compressed': '1a4fb632f0de0c53a0a31d57f840a19e56c645ee',
+    'public_key': None,
+    'range_max': 2854495385411919762116571938898990272765493247,
+    'range_min': 1427247692705959881058285969449495136382746624},
+   {'address': '1LuUHyrQr8PKSvbcY1v1PiuGuqFjWpDumN',
+    'bits': 152,
+    'hash160_compressed': 'da56cd815fa2f0d6a4ce6d25ed7b1a01d9f9bc6b',
+    'public_key': None,
+    'range_max': 5708990770823839524233143877797980545530986495,
+    'range_min': 2854495385411919762116571938898990272765493248},
+   {'address': '18192XpzzdDi2K11QVHR7td2HcPS6Qs5vg',
+    'bits': 153,
+    'hash160_compressed': '4ccf94a1b0efd63cddeee0ef5eee5ebe720cfcbf',
+    'public_key': None,
+    'range_max': 11417981541647679048466287755595961091061972991,
+    'range_min': 5708990770823839524233143877797980545530986496},
+   {'address': '1NgVmsCCJaKLzGyKLFJfVequnFW9ZvnMLN',
+    'bits': 154,
+    'hash160_compressed': 'edd2e206825fa8949d1304cd82c08d64b222f2eb',
+    'public_key': None,
+    'range_max': 22835963083295358096932575511191922182123945983,
+    'range_min': 11417981541647679048466287755595961091061972992},
+   {'address': '1AoeP37TmHdFh8uN72fu9AqgtLrUwcv2wJ',
+    'bits': 155,
+    'hash160_compressed': '6b8b7830f73c5bf9e8beb9f161ad82b3bde992e4',
+    'public_key': '035cd1854cae45391ca4ec428cc7e6c7d9984424b954209a8eea197b9e364c05f6',
+    'range_max': 45671926166590716193865151022383844364247891967,
+    'range_min': 22835963083295358096932575511191922182123945984},
+   {'address': '1FTpAbQa4h8trvhQXjXnmNhqdiGBd1oraE',
+    'bits': 156,
+    'hash160_compressed': '9ea3f29aaedf7da10b1488934c50a39e271b0b64',
+    'public_key': None,
+    'range_max': 91343852333181432387730302044767688728495783935,
+    'range_min': 45671926166590716193865151022383844364247891968},
+   {'address': '14JHoRAdmJg3XR4RjMDh6Wed6ft6hzbQe9',
+    'bits': 157,
+    'hash160_compressed': '242d790e5a168043c76f0539fd894b73ee67b3b3',
+    'public_key': None,
+    'range_max': 182687704666362864775460604089535377456991567871,
+    'range_min': 91343852333181432387730302044767688728495783936},
+   {'address': '19z6waranEf8CcP8FqNgdwUe1QRxvUNKBG',
+    'bits': 158,
+    'hash160_compressed': '628dacebb0faa7f81670e174ca4c8a95a7e37029',
+    'public_key': None,
+    'range_max': 365375409332725729550921208179070754913983135743,
+    'range_min': 182687704666362864775460604089535377456991567872},
+   {'address': '14u4nA5sugaswb6SZgn5av2vuChdMnD9E5',
+    'bits': 159,
+    'hash160_compressed': '2ac1295b4e54b3f15bb0a99f84018d2082495645',
+    'public_key': None,
+    'range_max': 730750818665451459101842416358141509827966271487,
+    'range_min': 365375409332725729550921208179070754913983135744},
+   {'address': '1NBC8uXJy1GiJ6drkiZa1WuKn51ps7EPTv',
+    'bits': 160,
+    'hash160_compressed': 'e84818e1bf7f699aa6e28ef9edfb582099099292',
+    'public_key': '02e0a8b039282faf6fe0fd769cfbc4b6b4cf8758ba68220eac420e32b91ddfa673',
+    'range_max': 1461501637330902918203684832716283019655932542975,
+    'range_min': 730750818665451459101842416358141509827966271488}]
+
+RAW_UNSOLVED_PUZZLE_DATA = _embedded_unsolved_puzzle_data()
+
+
 def _load_puzzle_dataset():
   """Build solved puzzle metadata directly from the inlined dataset."""
 
@@ -669,15 +1150,41 @@ def _load_puzzle_dataset():
   return dataset
 
 
+def _load_unsolved_puzzle_dataset():
+  """Build unsolved puzzle metadata, noting whether the public key is known."""
+
+  try:
+    raw_data = RAW_UNSOLVED_PUZZLE_DATA
+  except NameError:
+    raw_data = _embedded_unsolved_puzzle_data()
+
+  dataset = []
+  for entry in raw_data:
+    dataset.append({
+      "bits": entry["bits"],
+      "range_min": int(entry["range_min"]),
+      "range_max": int(entry["range_max"]),
+      "address": entry.get("address"),
+      "hash160_compressed": entry.get("hash160_compressed"),
+      "public_key": entry.get("public_key"),
+      "has_public_key": bool(entry.get("public_key")),
+    })
+  return dataset
+
+
 PUZZLE_DATA = _load_puzzle_dataset()
 PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
 SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
 
-# Target unsolved puzzles
-UNSOLVED_PUZZLES = [135, 140, 145, 150, 155, 160]
-
-# Puzzle 135 is our primary target
-TARGET_PUZZLE = 135
+UNSOLVED_PUZZLE_DATA = _load_unsolved_puzzle_dataset()
+UNSOLVED_METADATA = {entry["bits"]: entry for entry in UNSOLVED_PUZZLE_DATA}
+UNSOLVED_PUZZLES = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA]
+UNSOLVED_WITH_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA if entry["has_public_key"]]
+UNSOLVED_WITHOUT_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA if not entry["has_public_key"]]
+TARGET_PUZZLES = list(UNSOLVED_PUZZLES)
+# Legacy alias for older callers
+TARGET_PUZZLE = TARGET_PUZZLES[0] if TARGET_PUZZLES else None
+ALL_PUZZLE_METADATA = {**UNSOLVED_METADATA, **PUZZLE_METADATA}
 
 # ==============================================================================
 # ECC PRIMITIVES (secp256k1)
@@ -697,7 +1204,11 @@ def mod_inv(a, n):
 def _ensure_puzzle_metadata():
   """Rebuild puzzle metadata if the sandbox stripped module globals."""
 
-  global PUZZLE_DATA, PUZZLE_METADATA, SOLVED_PUZZLES, TARGET_PUZZLE, UNSOLVED_PUZZLES, RAW_PUZZLE_DATA
+  global PUZZLE_DATA, PUZZLE_METADATA, SOLVED_PUZZLES
+  global TARGET_PUZZLE, TARGET_PUZZLES, UNSOLVED_PUZZLES
+  global RAW_PUZZLE_DATA, RAW_UNSOLVED_PUZZLE_DATA
+  global UNSOLVED_PUZZLE_DATA, UNSOLVED_METADATA
+  global UNSOLVED_WITH_PUBLIC_KEYS, UNSOLVED_WITHOUT_PUBLIC_KEYS, ALL_PUZZLE_METADATA
 
   if "RAW_PUZZLE_DATA" not in globals():
     RAW_PUZZLE_DATA = _embedded_raw_puzzle_data()
@@ -707,10 +1218,25 @@ def _ensure_puzzle_metadata():
     PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
     SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
 
-  if "TARGET_PUZZLE" not in globals() or TARGET_PUZZLE is None:
-    TARGET_PUZZLE = 135
+  if "RAW_UNSOLVED_PUZZLE_DATA" not in globals():
+    RAW_UNSOLVED_PUZZLE_DATA = _embedded_unsolved_puzzle_data()
+
+  if "UNSOLVED_PUZZLE_DATA" not in globals() or UNSOLVED_PUZZLE_DATA is None:
+    UNSOLVED_PUZZLE_DATA = _load_unsolved_puzzle_dataset()
+    UNSOLVED_METADATA = {entry["bits"]: entry for entry in UNSOLVED_PUZZLE_DATA}
   if "UNSOLVED_PUZZLES" not in globals() or not UNSOLVED_PUZZLES:
-    UNSOLVED_PUZZLES = [135, 140, 145, 150, 155, 160]
+    UNSOLVED_PUZZLES = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA]
+  if "UNSOLVED_WITH_PUBLIC_KEYS" not in globals():
+    UNSOLVED_WITH_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA if entry.get("has_public_key")]
+  if "UNSOLVED_WITHOUT_PUBLIC_KEYS" not in globals():
+    UNSOLVED_WITHOUT_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA if not entry.get("has_public_key")]
+
+  ALL_PUZZLE_METADATA = {**UNSOLVED_METADATA, **PUZZLE_METADATA}
+
+  if "TARGET_PUZZLES" not in globals() or not TARGET_PUZZLES:
+    TARGET_PUZZLES = list(UNSOLVED_PUZZLES)
+  if "TARGET_PUZZLE" not in globals() or TARGET_PUZZLE is None:
+    TARGET_PUZZLE = TARGET_PUZZLES[0] if TARGET_PUZZLES else None
 
 
 def point_add(p1, p2):
@@ -746,7 +1272,7 @@ def scalar_mult(point, k):
 def get_puzzle_range(puzzle_number):
   """Get the valid range for a puzzle number."""
   _ensure_puzzle_metadata()
-  meta = PUZZLE_METADATA.get(puzzle_number)
+  meta = ALL_PUZZLE_METADATA.get(puzzle_number)
   if meta:
     return meta["range_min"], meta["range_max"]
   range_start = 2 ** (puzzle_number - 1)
@@ -800,13 +1326,15 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   features['range_min'] = range_min
   features['range_max'] = range_max
 
-  meta = PUZZLE_METADATA.get(puzzle_number)
-  if meta:
-    # Public key metadata
+  meta = ALL_PUZZLE_METADATA.get(puzzle_number)
+  if meta and meta.get('public_key'):
     features['pubkey_prefix'] = int(meta['public_key'][:2], 16) / 255.0
-    features['hash160_prefix'] = int(meta['hash160_compressed'][:2], 16) / 255.0
   else:
     features['pubkey_prefix'] = 0.0
+
+  if meta and meta.get('hash160_compressed'):
+    features['hash160_prefix'] = int(meta['hash160_compressed'][:2], 16) / 255.0
+  else:
     features['hash160_prefix'] = 0.0
 
   # Get position ratios of all solved puzzles
@@ -1018,15 +1546,26 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
   # === PUBLIC KEY COORDINATE PATTERNS ===
   # Analyze public keys of solved puzzles (use small subset for speed)
   if len(solved_puzzles) >= 3:
-    # Get public keys of last few puzzles (fast computation for small keys)
+    # Get public keys of last few puzzles whose keys are cheap to compute
     pubkey_data = []
-    for pnum in sorted(solved_puzzles.keys())[-10:]:
-      if pnum < puzzle_number and solved_puzzles[pnum] < 2**40:  # Only compute for small keys
-        try:
-          Qx, Qy = get_public_key(solved_puzzles[pnum])
-          pubkey_data.append((pnum, Qx, Qy))
-        except:
-          pass
+    compute_limit = 2 ** 40
+    max_pubkey_samples = 10
+
+    eligible_puzzles = []
+    for pnum in sorted(solved_puzzles.keys(), reverse=True):
+      if pnum >= puzzle_number:
+        continue
+      if solved_puzzles[pnum] < compute_limit:
+        eligible_puzzles.append(pnum)
+      if len(eligible_puzzles) >= max_pubkey_samples:
+        break
+
+    for pnum in sorted(eligible_puzzles):
+      try:
+        Qx, Qy = get_public_key(solved_puzzles[pnum])
+        pubkey_data.append((pnum, Qx, Qy))
+      except:
+        pass
 
     if len(pubkey_data) >= 2:
       # Coordinate patterns
@@ -1311,9 +1850,11 @@ def evaluate(seed: int) -> float:
   _ensure_puzzle_metadata()
 
   # Rebuild globals if needed
-  global SOLVED_PUZZLES, TARGET_PUZZLE
+  global SOLVED_PUZZLES, TARGET_PUZZLE, TARGET_PUZZLES
+  if "TARGET_PUZZLES" not in globals() or not TARGET_PUZZLES:
+    TARGET_PUZZLES = list(UNSOLVED_PUZZLES)
   if "TARGET_PUZZLE" not in globals() or TARGET_PUZZLE is None:
-    TARGET_PUZZLE = 135
+    TARGET_PUZZLE = TARGET_PUZZLES[0] if TARGET_PUZZLES else None
 
   rng = np.random.default_rng(seed)
   score = 0.0
@@ -1378,14 +1919,15 @@ def evaluate(seed: int) -> float:
     r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
     score += r2 * 100.0 if r2 > 0 else 0.0
 
-  # BONUS: Predict puzzle 135 and check if it's reasonable
-  features_135 = compute_puzzle_features(TARGET_PUZZLE, SOLVED_PUZZLES)
-  pred_135 = priority(features_135)
-  pred_135 = max(0.0, min(1.0, pred_135))
+  # BONUS: Predict each unsolved target and reward non-trivial outputs
+  for target_bits in TARGET_PUZZLES:
+    features_target = compute_puzzle_features(target_bits, SOLVED_PUZZLES)
+    pred_target = priority(features_target)
+    pred_target = max(0.0, min(1.0, pred_target))
 
-  # Reward predictions that are in valid range and not trivial (0.5)
-  if 0.0 < pred_135 < 1.0 and abs(pred_135 - 0.5) > 0.01:
-    score += 20.0
+    if 0.0 < pred_target < 1.0 and abs(pred_target - 0.5) > 0.01:
+      bonus = 20.0 if target_bits in UNSOLVED_WITH_PUBLIC_KEYS else 10.0
+      score += bonus
 
   return float(score)
 
