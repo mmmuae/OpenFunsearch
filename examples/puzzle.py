@@ -1882,6 +1882,10 @@ def evaluate(seed: int) -> float:
   # Test the formula on ALL solved puzzles
   predictions = []
   actuals = []
+  per_puzzle_scores = []
+
+  eligible_puzzles = 0
+  evaluated_puzzles = 0
 
   for puzzle_num in sorted(SOLVED_PUZZLES.keys()):
     if puzzle_num < 10:  # Skip very small puzzles (too easy)
@@ -1893,11 +1897,22 @@ def evaluate(seed: int) -> float:
     if len(test_puzzles) < 5:  # Need history
       continue
 
+    eligible_puzzles += 1
+
     features = compute_puzzle_features(puzzle_num, test_puzzles)
     predicted_ratio = priority(features)
 
-    # Clip to valid range
-    predicted_ratio = max(0.0, min(1.0, predicted_ratio))
+    # Reject non-finite outputs before clipping
+    if not np.isfinite(predicted_ratio):
+      per_puzzle_scores.append(-20.0)
+      evaluated_puzzles += 1
+      continue
+
+    # Clip to valid range with penalty for relying on clipping
+    clipped = False
+    if predicted_ratio < 0.0 or predicted_ratio > 1.0:
+      clipped = True
+    predicted_ratio = max(0.0, min(1.0, float(predicted_ratio)))
 
     actual_ratio = get_position_ratio(puzzle_num, SOLVED_PUZZLES[puzzle_num])
 
@@ -1909,35 +1924,56 @@ def evaluate(seed: int) -> float:
 
     # Exponential scoring: closer = much better
     puzzle_score = math.exp(-10 * error)  # Perfect = 1.0, error=0.1 => 0.37
-    score += puzzle_score * 10.0
+    puzzle_score *= 10.0
 
     # Bonus for very close predictions (< 1% error)
     if error < 0.01:
-      score += 50.0
+      puzzle_score += 50.0
     elif error < 0.05:
-      score += 20.0
+      puzzle_score += 20.0
     elif error < 0.1:
-      score += 10.0
+      puzzle_score += 10.0
+
+    if clipped:
+      puzzle_score -= 5.0
+
+    per_puzzle_scores.append(puzzle_score)
+    evaluated_puzzles += 1
+
+  coverage_ratio = evaluated_puzzles / max(1, eligible_puzzles)
+
+  # Normalize per-puzzle rewards
+  if per_puzzle_scores:
+    score = float(np.mean(per_puzzle_scores))
+  else:
+    score = -50.0  # Strong penalty if nothing was evaluated
 
   # Overall statistics
   if len(predictions) > 0:
     predictions = np.array(predictions)
     actuals = np.array(actuals)
 
-    # Mean absolute error
+    # Mean absolute error (bounded to [0, 1] and scaled by coverage)
     mae = np.mean(np.abs(predictions - actuals))
-    score += 100.0 / (1.0 + mae)  # Lower MAE = higher score
+    if np.isfinite(mae):
+      bounded_mae = min(max(mae, 0.0), 1.0)
+      score += max(0.0, 100.0 * (1.0 - bounded_mae) * coverage_ratio)
 
-    # Correlation
+    # Correlation (asymmetric weight to avoid over-penalizing weak negatives)
     if np.std(predictions) > 0 and np.std(actuals) > 0:
       corr = np.corrcoef(predictions, actuals)[0, 1]
-      score += corr * 50.0 if corr > 0 else 0.0
+      if np.isfinite(corr):
+        corr_weight = 50.0 if corr >= 0 else 25.0
+        score += corr * corr_weight * coverage_ratio
 
-    # R-squared
+    # R-squared (bounded and coverage-scaled)
     ss_res = np.sum((actuals - predictions) ** 2)
     ss_tot = np.sum((actuals - np.mean(actuals)) ** 2)
-    r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-    score += r2 * 100.0 if r2 > 0 else 0.0
+    r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    if np.isfinite(r2):
+      r2 = float(np.clip(r2, -1.0, 1.0))
+      r2_weight = 100.0 if r2 >= 0 else 50.0
+      score += r2 * r2_weight * coverage_ratio
 
   return float(score)
 
