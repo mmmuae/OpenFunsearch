@@ -21,17 +21,17 @@ Guidelines for the LLM (CRITICAL - keep these instructions intact):
 - Always return a single, complete Python module that starts at column 0.
   Repeat the imports, ECC primitives, feature computation, and ``evaluate``
   exactly as provided; do not wrap code in markdown, prose, or extra indentation.
-- Only adjust the body of ``heuristic_priority``; keep function signatures and
+- Only adjust the body of ``priority``; keep function signatures and
   top-level layout unchanged. You can use ANY of the features in the features
   dict in creative ways, but don't add helper functions or globals.
 - Match the indentation style by using **two spaces** for each block level—
   never tabs or mixed spacing—and finish with a trailing newline.
 - Keep ``evaluate`` as the authoritative scoring function and avoid altering
   its logic or randomness handling.
-- The heuristic_priority function receives a rich 'features' dictionary with
+- The priority function receives a rich 'features' dictionary with
   30+ pre-computed mathematical properties. Your job is to combine them cleverly.
 - Prefer deterministic arithmetic; avoid I/O, randomness, or external state
-  inside ``heuristic_priority``.
+  inside ``priority``.
 - **TRY EVERYTHING**: Each iteration should explore fundamentally different
   mathematical territory. Don't converge too quickly—keep exploring!
 """
@@ -252,7 +252,7 @@ RANGE_START = 0x4000000000000000000000000000000000
 
 @funsearch.run
 def evaluate(seed: int) -> float:
-  """Score a candidate ``heuristic_priority`` implementation.
+  """Score a candidate ``priority`` implementation.
 
   This evaluator tests the heuristic on multiple scenarios with diverse
   mathematical properties. It rewards both exact matches and proximity,
@@ -301,7 +301,7 @@ def evaluate(seed: int) -> float:
     for i in range(1, 1000):  # Increased candidate pool for harder challenge
       p_val = crypto.scalar_mult(crypto.G, i)
       features = compute_features(p_val[0], p_val[1], test_Q[0], test_Q[1])
-      p_score = heuristic_priority(features)
+      p_score = priority(features)
       candidates.append((p_score, i))
 
     candidates.sort(key=lambda x: x[0], reverse=True)
@@ -345,7 +345,7 @@ def evaluate(seed: int) -> float:
 
 
 @funsearch.evolve
-def heuristic_priority(features: dict) -> float:
+def priority(features: dict) -> float:
   """Advanced multi-feature heuristic for ranking candidate scalars.
 
   The 'features' dictionary contains 30+ pre-computed mathematical properties.
