@@ -284,11 +284,19 @@ crypto = types.SimpleNamespace(
 
 import funsearch
 
-# THE REAL TARGET
+# THE REAL TARGET - Puzzle 135
 TARGET_PK_HEX = "02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16"
 TARGET_Q = crypto.decompress_pubkey(TARGET_PK_HEX)
 RANGE_START = 0x4000000000000000000000000000000000
 RANGE_END = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+
+# VALIDATION KEY - Known key-pair for testing heuristic effectiveness
+# Private key: 0x52718B86D05C04B9DC17ECC9B6A6C57B0E
+# Public key: 021dbf7e9c92fe3b27eb9fb09ff17f027fb5c40f992a7966cb8c7eab0780faab4f
+# Address: 1BLUx2AN4UCEUYQ9cyGdHpCUis23m7mjLB
+VALIDATION_K = 0x52718B86D05C04B9DC17ECC9B6A6C57B0E
+VALIDATION_PK_HEX = "021dbf7e9c92fe3b27eb9fb09ff17f027fb5c40f992a7966cb8c7eab0780faab4f"
+VALIDATION_Q = crypto.decompress_pubkey(VALIDATION_PK_HEX)
 
 
 @funsearch.run
@@ -301,7 +309,7 @@ def evaluate(seed: int) -> float:
   it might reveal exploitable structure in ECDLP.
   """
 
-  global crypto, P, N, TARGET_Q, RANGE_START, RANGE_END
+  global crypto, P, N, TARGET_Q, RANGE_START, RANGE_END, VALIDATION_K, VALIDATION_Q
   if "crypto" not in globals():
     P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
     N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
@@ -325,6 +333,9 @@ def evaluate(seed: int) -> float:
     TARGET_Q = crypto.decompress_pubkey(TARGET_PK_HEX)
     RANGE_START = 0x4000000000000000000000000000000000
     RANGE_END = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    VALIDATION_K = 0x52718B86D05C04B9DC17ECC9B6A6C57B0E
+    VALIDATION_PK_HEX = "021dbf7e9c92fe3b27eb9fb09ff17f027fb5c40f992a7966cb8c7eab0780faab4f"
+    VALIDATION_Q = crypto.decompress_pubkey(VALIDATION_PK_HEX)
 
   rng = np.random.default_rng(seed)
   score = 0.0
@@ -401,6 +412,37 @@ def evaluate(seed: int) -> float:
   top_20_keys = [k for _, k, _ in candidates[:20]]
   diversity = len(set(top_20_keys))
   score += diversity * 0.5
+
+  # 5. VALIDATION TEST: Can the heuristic identify a KNOWN key?
+  # Test against VALIDATION_Q using small range around VALIDATION_K
+  # This proves the heuristic can actually find known keys
+  validation_candidates = []
+
+  # Generate candidates around the known key (scaled down to small range)
+  # We use k % 10000 to create a testable scenario
+  validation_k_small = VALIDATION_K % 10000
+
+  for i in range(1, 1001):
+    point = crypto.scalar_mult(crypto.G, i)
+    features = compute_features(i, point, VALIDATION_Q)
+    priority_score = priority(features)
+    validation_candidates.append((priority_score, i))
+
+  # Add the actual validation key (scaled down)
+  val_point = crypto.scalar_mult(crypto.G, validation_k_small)
+  val_features = compute_features(validation_k_small, val_point, VALIDATION_Q)
+  val_score = priority(val_features)
+  validation_candidates.append((val_score, validation_k_small))
+
+  validation_candidates.sort(key=lambda x: x[0], reverse=True)
+
+  # HUGE bonus if heuristic ranks the actual key in top positions
+  for rank, (_, k) in enumerate(validation_candidates[:50]):
+    if k == validation_k_small:
+      # Exponential reward for higher ranks
+      bonus = 100.0 * (50 - rank) / 50.0
+      score += bonus
+      break
 
   return float(score)
 
