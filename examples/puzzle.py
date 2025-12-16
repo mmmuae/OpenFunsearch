@@ -657,6 +657,15 @@ def mod_inv(a, n):
   return pow(a, n - 2, n)
 
 
+def _ensure_puzzle_metadata():
+  """Rebuild puzzle metadata if the sandbox stripped module globals."""
+  global PUZZLE_DATA, PUZZLE_METADATA, SOLVED_PUZZLES
+  if "PUZZLE_METADATA" not in globals() or PUZZLE_METADATA is None:
+    PUZZLE_DATA = _load_puzzle_dataset()
+    PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
+    SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
+
+
 def point_add(p1, p2):
   if p1 is None:
     return p2
@@ -689,6 +698,7 @@ def scalar_mult(point, k):
 
 def get_puzzle_range(puzzle_number):
   """Get the valid range for a puzzle number."""
+  _ensure_puzzle_metadata()
   meta = PUZZLE_METADATA.get(puzzle_number)
   if meta:
     return meta["range_min"], meta["range_max"]
@@ -730,6 +740,9 @@ def compute_puzzle_features(puzzle_number, solved_puzzles):
     Dictionary with 200+ features from all mathematical methods
   """
   features = {}
+
+  # Recreate metadata if globals were stripped by the sandbox.
+  _ensure_puzzle_metadata()
 
   # Basic features
   features['puzzle_number'] = puzzle_number
@@ -1247,6 +1260,8 @@ def evaluate(seed: int) -> float:
   Tests if the priority function can predict position_ratio for known puzzles.
   Higher score = better predictions across all puzzles.
   """
+
+  _ensure_puzzle_metadata()
 
   # Rebuild globals if needed
   global SOLVED_PUZZLES, TARGET_PUZZLE
