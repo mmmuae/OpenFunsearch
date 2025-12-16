@@ -1,18 +1,13 @@
 """Elliptic-curve scalar search heuristic for Puzzle 135.
 
-Guidelines for the LLM (keep these instructions intact):
+- On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
 - Always return a single, complete Python module that starts at column 0.
   Repeat the imports, ECC primitives, and ``evaluate`` exactly as provided; do
   not wrap code in markdown, prose, or extra indentation.
-- Only adjust the body of ``heuristic_priority``; keep function signatures and
+- Only adjust the body of ``priority``; keep function signatures and
   top-level layout unchanged. Avoid adding helper functions or globals.
-- Match the indentation style of ``examples/capset.py`` by using **two spaces**
-  for each block level—never tabs or mixed spacing—and finish with a trailing
-  newline.
 - Keep ``evaluate`` as the authoritative scoring function and avoid altering
   its logic or randomness handling.
-- Prefer short, deterministic arithmetic; avoid I/O, randomness, or external
-  state inside ``heuristic_priority``.
 """
 
 import numpy as np
@@ -91,7 +86,7 @@ RANGE_START = 0x4000000000000000000000000000000000
 
 @funsearch.run
 def evaluate(seed: int) -> float:
-  """Score a candidate ``heuristic_priority`` implementation.
+  """Score a candidate ``priority`` implementation.
 
   The evaluator exercises the heuristic on a smaller window that mimics the
   135-bit challenge. The score rewards correct scalar guesses and proximity to
@@ -126,7 +121,7 @@ def evaluate(seed: int) -> float:
     candidates = []
     for i in range(1, 500):
       p_val = crypto.scalar_mult(crypto.G, i)
-      p_score = heuristic_priority(
+      p_score = priority(
         p_val[0], p_val[1], test_Q[0], test_Q[1]
       )
       candidates.append((p_score, i))
@@ -146,11 +141,11 @@ def evaluate(seed: int) -> float:
 
 
 @funsearch.evolve
-def heuristic_priority(px, py, qx, qy) -> float:
+def priority(px, py, qx, qy) -> float:
   """Baseline heuristic for ranking candidate scalars.
 
-  Keep this function short, deterministic, and free of side effects so the
-  sandbox can parse it without indentation errors.
+  Keep this function medium size, deterministic, and free of side effects so the
+  sandbox can parse it without errors.
   """
 
   shared_bits = bin(px ^ qx).count("0")
