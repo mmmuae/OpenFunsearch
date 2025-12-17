@@ -2189,5 +2189,56 @@ def priority(features: dict) -> float:
   # Normalize to [0,1] range
   pred = max(0.0, min(1.0, pred))
 
+  # NEW: Incorporate a new algorithmic pattern based on the number of
+  # prime factors of n (or related number theory)
+  try:
+    def prime_factors_count(n):
+      if n <= 1:
+        return 0
+      count = 0
+      d = 2
+      while d * d <= n:
+        while n % d == 0:
+          count += 1
+          n //= d
+        d += 1
+      if n > 1:
+        count += 1
+      return count
+
+    prime_count = prime_factors_count(n)
+    if n > 0:
+      # Apply a correction factor based on prime factor count
+      prime_factor_correction = (prime_count % 5) / 10.0
+      pred = pred * 0.85 + prime_factor_correction * 0.15
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a pseudo-random sequence derived from
+  # the current puzzle number and the previous two predictions
+  try:
+    # Simple hash-like function
+    seed = int(n) + int(pos_n_minus_1 * 1000) + int(pos_n_minus_2 * 1000)
+    hash_val = (seed * 1103515245 + 12345) & 0x7fffffff
+    pseudo_random = hash_val / (2**31 - 1)
+    pred = pred * 0.9 + pseudo_random * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on puzzle number modulo 7
+  try:
+    weight_idx = int(n) % 7
+    weights = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
+    weight = weights[weight_idx]
+    # Combine current prediction with a simple moving average
+    moving_avg = (pos_n_minus_1 + pos_n_minus_2) / 2
+    pred = pred * (1 - weight) + moving_avg * weight
+  except Exception:
+    pass
+
+  # Normalize to [0,1] range
+  pred = max(0.0, min(1.0, pred))
+
   return float(pred)
 
