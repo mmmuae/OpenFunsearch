@@ -2017,6 +2017,7 @@ def priority(features: dict) -> float:
   pos_mean = features.get('pos_mean', 0.5)
   pos_std = features.get('pos_std', 0.0)
   state_increasing = features.get('state_increasing', 0)
+  n = features.get('n', features.get('puzzle_number', 0))
 
   # Base prediction using last known position
   pred = pos_n_minus_1
@@ -2110,7 +2111,7 @@ def priority(features: dict) -> float:
 
   # Add a new pattern: use transcendental constants to predict.
   # Keep the influence small so we don't drown out learned structure.
-  idx = int(features.get('n', features.get('puzzle_number', 0)))
+  idx = int(n)
   idx = max(0, idx)
   pi_digit = _digit_from_constant(PI_DIGITS, idx)
   e_digit = _digit_from_constant(E_DIGITS, idx)
@@ -2137,6 +2138,156 @@ def priority(features: dict) -> float:
       pred = pred * 0.8 + x_next * 0.2
   except Exception:
     pass  # Silently continue if error occurs
+
+  # Apply a more sophisticated recursive pattern based on continued fractions
+  # and modular arithmetic
+  try:
+    if n > 0:
+      # Estimate a continued fraction-like structure
+      cf_approx = 1.0 / (n + 1) if n > 0 else 0.0
+      pred = pred * 0.9 + cf_approx * 0.1
+  except Exception:
+    pass
+
+  # Normalize to [0,1] range
+  pred = max(0.0, min(1.0, pred))
+
+  # NEW: Add a more sophisticated recursive pattern based on Fibonacci-like
+  # sequences and modular arithmetic
+  try:
+    if n > 1:
+      # Estimate Fibonacci-like behavior
+      fib_like = (pos_n_minus_1 + pos_n_minus_2) / 2
+      # Blend with existing prediction
+      pred = pred * 0.7 + fib_like * 0.3
+  except Exception:
+    pass
+
+  # NEW: Apply a phase space reconstruction using a sine wave with
+  # frequency based on puzzle number
+  try:
+    if n > 0:
+      phase = (n * 0.5) % 1.0
+      wavelet_component = math.sin(2 * math.pi * phase)
+      pred = pred * 0.8 + wavelet_component * 0.2
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that switches between regimes based on
+  # a simple condition
+  regime = int(n) % 3
+  if regime == 0:
+    # Linear trend
+    pred = pred * 0.9 + 0.1 * pos_n_minus_1
+  elif regime == 1:
+    # Chaotic behavior
+    pred = pred * 0.7 + 0.3 * (1 - pred)
+  else:
+    # Mean-reverting
+    pred = pred * 0.6 + 0.4 * 0.5
+
+  # Normalize to [0,1] range
+  pred = max(0.0, min(1.0, pred))
+
+  # NEW: Incorporate a new algorithmic pattern based on the number of
+  # prime factors of n (or related number theory)
+  try:
+    def prime_factors_count(n):
+      if n <= 1:
+        return 0
+      count = 0
+      d = 2
+      while d * d <= n:
+        while n % d == 0:
+          count += 1
+          n //= d
+        d += 1
+      if n > 1:
+        count += 1
+      return count
+
+    prime_count = prime_factors_count(n)
+    if n > 0:
+      # Apply a correction factor based on prime factor count
+      prime_factor_correction = (prime_count % 5) / 10.0
+      pred = pred * 0.85 + prime_factor_correction * 0.15
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a pseudo-random sequence derived from
+  # the current puzzle number and the previous two predictions
+  try:
+    # Simple hash-like function
+    seed = int(n) + int(pos_n_minus_1 * 1000) + int(pos_n_minus_2 * 1000)
+    hash_val = (seed * 1103515245 + 12345) & 0x7fffffff
+    pseudo_random = hash_val / (2**31 - 1)
+    pred = pred * 0.9 + pseudo_random * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on puzzle number modulo 7
+  try:
+    weight_idx = int(n) % 7
+    weights = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
+    weight = weights[weight_idx]
+    # Combine current prediction with a simple moving average
+    moving_avg = (pos_n_minus_1 + pos_n_minus_2) / 2
+    pred = pred * (1 - weight) + moving_avg * weight
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on puzzle number modulo 5
+  try:
+    weight_idx = int(n) % 5
+    weights = [0.1, 0.2, 0.3, 0.4, 0.5]
+    weight = weights[weight_idx]
+    # Apply a more complex recurrence relation
+    if n > 1:
+      rec = (pos_n_minus_1 * 0.7 + pos_n_minus_2 * 0.3) * \
+          (1 - weight) + weight * 0.5
+      pred = pred * (1 - weight) + rec * weight
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a modular arithmetic sequence
+  try:
+    if n > 0:
+      mod_seq = (n * 31 + 13) % 100
+      mod_correction = mod_seq / 100.0
+      pred = pred * 0.9 + mod_correction * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on a more complex function of n
+  try:
+    # Use a pseudo-random generator based on n and a constant
+    seed = (n * 1000003) % 1000000
+    hash_val = (seed * 1103515245 + 12345) & 0x7fffffff
+    pseudo_random = hash_val / (2**31 - 1)
+    # Blend with existing prediction
+    pred = pred * 0.85 + pseudo_random * 0.15
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on the square root of n
+  try:
+    if n > 0:
+      sqrt_n = math.sqrt(n)
+      sqrt_correction = sqrt_n % 1.0
+      pred = pred * 0.9 + sqrt_correction * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a sigmoid-like function of n
+  try:
+    if n > 0:
+      sigmoid = 1 / (1 + math.exp(-n * 0.1))
+      pred = pred * 0.9 + sigmoid * 0.1
+  except Exception:
+    pass
 
   # Normalize to [0,1] range
   pred = max(0.0, min(1.0, pred))
