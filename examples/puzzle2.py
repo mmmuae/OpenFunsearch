@@ -40,21 +40,21 @@ SCORING SYSTEM (Maximum: 1000 points):
    - Uses weighted average, not simple mean
    - Prevents gaming by solving only one hard puzzle
 
-3. COVERAGE REQUIREMENT:
-   - Must evaluate 80%+ of eligible puzzles to get any score
-   - Need 90%+ coverage for full score (1.0x multiplier)
-   - 80-90% coverage: 0.0x to 0.5x multiplier
-   - 90-100% coverage: 0.5x to 1.0x multiplier
+3. COVERAGE MULTIPLIER:
+   - Simple linear scaling from 0% to 100% coverage
+   - 0% coverage: 0.0x multiplier
+   - 50% coverage: 0.5x multiplier
+   - 100% coverage: 1.0x multiplier (full score)
 
 4. FAIRNESS EXAMPLES:
    - Solution A: Gets puzzle 66 perfect (100 pts) but fails rest
-     → Weighted score ≈ 100, but coverage penalty → Final: ~0
+     → Weighted score ≈ 3, coverage ~2% → Final: ~0.6
 
    - Solution B: Gets puzzles 6-60 perfect (100 pts each)
-     → Weighted score = 100, full coverage → Final: 1000
+     → Weighted score = 100, coverage 100% → Final: 1000
 
    - Solution C: Gets all puzzles with 50% bit accuracy
-     → Weighted score ≈ 3, full coverage → Final: 30
+     → Weighted score ≈ 3, coverage 100% → Final: 30
 
 5. FINAL CALCULATION:
    Final Score = Weighted_Mean_Score × 10 × Coverage_Multiplier
@@ -170,13 +170,13 @@ def evaluate(seed: int) -> float:
   SCORING SYSTEM (Maximum: 1000 points):
   - Per-puzzle score: 0-100 points based on bit-level accuracy
   - Difficulty weighting: Harder puzzles (higher bits) weighted more in average
-  - Coverage requirement: Must evaluate 90%+ of puzzles for full score
+  - Coverage multiplier: Linear 0-100% (no harsh cutoffs)
   - Balanced: Can't game system by only solving one hard puzzle
 
   FAIRNESS:
   - Getting puzzle 66 right = 100 points (weighted heavily)
   - Getting puzzles 1-60 right = 100 points each (weighted by difficulty)
-  - Coverage ensures consistency across all puzzles matters
+  - Coverage scales linearly - 50% coverage = 50% of score
   - Weighted average prevents cherry-picking single hard puzzles
   """
 
@@ -294,26 +294,15 @@ def evaluate(seed: int) -> float:
   # Coverage: fraction of puzzles successfully evaluated
   coverage = float(evaluated_count) / float(eligible_count)
 
-  # If too many failures, heavily penalize
-  failure_rate = float(failed_puzzles) / float(evaluated_count)
-  if failure_rate > 0.5:  # More than 50% failures
-    return 0.0
-
   # Calculate weighted mean score (0-100 scale)
   if weight_sum > 0:
     weighted_mean_score = weighted_score_sum / weight_sum
   else:
     weighted_mean_score = 0.0
 
-  # Coverage multiplier (need at least 80% coverage for any score)
-  if coverage < 0.8:
-    coverage_multiplier = 0.0  # Not enough coverage
-  elif coverage < 0.9:
-    # Linear scaling from 0.8 to 0.9: 0.0 to 0.5
-    coverage_multiplier = (coverage - 0.8) * 5.0
-  else:
-    # Linear scaling from 0.9 to 1.0: 0.5 to 1.0
-    coverage_multiplier = 0.5 + (coverage - 0.9) * 5.0
+  # Coverage multiplier: Simple linear scaling (0 to 1)
+  # 0% coverage = 0.0x, 50% coverage = 0.5x, 100% coverage = 1.0x
+  coverage_multiplier = coverage
 
   # Final score: weighted mean (0-100) * 10 * coverage multiplier
   # Maximum: 100 * 10 * 1.0 = 1000 points
