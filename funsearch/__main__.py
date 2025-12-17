@@ -5,8 +5,10 @@ import pathlib
 import pickle
 import time
 import datetime
+from dataclasses import dataclass
 
 import click
+import httpx
 import torch
 from llama_cpp import Llama
 
@@ -21,6 +23,53 @@ print(f"main - Python version: {'.'.join(map(str, sys.version_info[:3]))}")
 
 
 from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator
+
+
+@dataclass
+class _OllamaResponse:
+  content: str
+
+  def text(self):
+    return self.content
+
+  def __str__(self):
+    return self.content
+
+
+class OllamaPassthroughModel:
+  """Minimal Ollama model wrapper that talks directly to the Ollama API.
+
+  This bypasses llm's local tag validation so cloud-only model names can be used.
+  """
+
+  def __init__(self, model_name: str, api_base: str | None = None, timeout: int = 120) -> None:
+    self.model_id = model_name
+    env_api_base = os.environ.get("OLLAMA_API_BASE") or os.environ.get("OLLAMA_HOST")
+    base = api_base or env_api_base or "http://127.0.0.1:11434"
+    self.api_base = base.rstrip("/")
+    self.timeout = timeout
+
+  def prompt(self, prompt: str, system: str | None = None, stream: bool = True, **options):
+    payload = {
+        "model": self.model_id,
+        "prompt": prompt,
+        # Use non-streaming so we can return the whole response text consistently.
+        "stream": False,
+    }
+    if system:
+      payload["system"] = system
+    # Allow callers to pass through generation options like temperature, etc.
+    payload.update({k: v for k, v in options.items() if v is not None})
+
+    url = f"{self.api_base}/api/generate"
+    try:
+      response = httpx.post(url, json=payload, timeout=self.timeout)
+      response.raise_for_status()
+    except Exception as exc:
+      raise RuntimeError(f"Failed to call Ollama at {url}: {exc}") from exc
+
+    data = response.json()
+    return _OllamaResponse(data.get("response", ""))
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -69,7 +118,7 @@ def main(ctx):
 @click.argument("spec_file", type=click.File("r"))
 @click.argument('inputs')
 @click.option('--model_name', default="gpt-3.5-turbo-instruct", help='LLM model') # ORIGINAL
-# @click.option('--model_name', default="codellama-13b-python.Q5_K_M", help='LLM model') # ORIGINAL# 
+# @click.option('--model_name', default="codellama-13b-python.Q5_K_M", help='LLM model') # ORIGINAL#
 # @click.option('--model_name', default="starcoder-newbpe-q4_0", help='LLM model') # CHANGED VERSION
 @click.option('--output_path', default="./data/", type=click.Path(file_okay=False), help='path for logs and data')
 @click.option('--load_backup', default=None, type=click.File("rb"), help='Use existing program database')
@@ -112,7 +161,7 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
   log_path = pathlib.Path(output_path) / f"{problem_name}_{model_name}_n={sanitized_inputs}_{timestamp}"
   # Use llm backends for:
   # - OpenAI-style names starting with "gpt"
-  # - Ollama-style names containing ":" like "qwen3-coder:30b"
+  # - Ollama-style names containing ":" like "qwen3-coder:30b" (local or cloud)
   if model_name.startswith('gpt') or (':' in model_name):
     model_type = 'gpt'
 
@@ -128,7 +177,18 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
 
     # Import llm here after setting environment variables
     import llm
-    model = llm.get_model(model_name)
+
+    try:
+      model = llm.get_model(model_name)
+    except llm.UnknownModelError:
+      if ':' in model_name:
+        logging.info(
+            "Ollama model '%s' not found locally; sending prompts directly to the Ollama API.",
+            model_name,
+        )
+        model = OllamaPassthroughModel(model_name)
+      else:
+        raise
 
     # Some llm backends need a key; Ollama does not.
     if hasattr(model, 'get_key') and hasattr(model, 'key'):
