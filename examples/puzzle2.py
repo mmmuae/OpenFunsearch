@@ -1,12 +1,6 @@
-"""Bitcoin Puzzle Private Key Discovery - guided FunSearch prompt
+"""Bitcoin Puzzle Private Key Discovery -
 
-This version mirrors the concise, easy-to-edit structure used by the other
-examples.  The goal is still open-ended (predict the private key for puzzle N),
-but we steer the model toward producing actual code inside ``priority`` by:
-- Keeping instructions short and specific
-- Providing a simple, working baseline
-- Making it clear that only the body of ``priority`` should change
-- Using small helper utilities the model can safely remix
+On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
 
 WHAT YOU GET
 - puzzle_num, range_min, range_max
@@ -17,9 +11,6 @@ WHAT TO DO
 - Stay within the provided [range_min, range_max]
 - Return an integer (float is OK; it will be cast to int)
 
-WHY THESE GUARDRAILS
-- Previous prompt led to empty priority sections in generated code
-- This streamlined version matches working patterns in other examples
 """
 
 import math

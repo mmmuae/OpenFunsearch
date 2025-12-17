@@ -2237,8 +2237,59 @@ def priority(features: dict) -> float:
   except Exception:
     pass
 
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on puzzle number modulo 5
+  try:
+    weight_idx = int(n) % 5
+    weights = [0.1, 0.2, 0.3, 0.4, 0.5]
+    weight = weights[weight_idx]
+    # Apply a more complex recurrence relation
+    if n > 1:
+      rec = (pos_n_minus_1 * 0.7 + pos_n_minus_2 * 0.3) * \
+          (1 - weight) + weight * 0.5
+      pred = pred * (1 - weight) + rec * weight
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a modular arithmetic sequence
+  try:
+    if n > 0:
+      mod_seq = (n * 31 + 13) % 100
+      mod_correction = mod_seq / 100.0
+      pred = pred * 0.9 + mod_correction * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a hybrid rule that uses a weighted average of multiple
+  # patterns, with weights based on a more complex function of n
+  try:
+    # Use a pseudo-random generator based on n and a constant
+    seed = (n * 1000003) % 1000000
+    hash_val = (seed * 1103515245 + 12345) & 0x7fffffff
+    pseudo_random = hash_val / (2**31 - 1)
+    # Blend with existing prediction
+    pred = pred * 0.85 + pseudo_random * 0.15
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on the square root of n
+  try:
+    if n > 0:
+      sqrt_n = math.sqrt(n)
+      sqrt_correction = sqrt_n % 1.0
+      pred = pred * 0.9 + sqrt_correction * 0.1
+  except Exception:
+    pass
+
+  # NEW: Apply a correction based on a sigmoid-like function of n
+  try:
+    if n > 0:
+      sigmoid = 1 / (1 + math.exp(-n * 0.1))
+      pred = pred * 0.9 + sigmoid * 0.1
+  except Exception:
+    pass
+
   # Normalize to [0,1] range
   pred = max(0.0, min(1.0, pred))
 
   return float(pred)
-
