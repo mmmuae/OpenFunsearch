@@ -30,6 +30,14 @@ To run a Funsearch experiment, you can use the `run_funsearch.py` script. This s
 python run_funsearch.py
 ```
 
+If you want to use a remote Ollama deployment instead of a local model server, pass the API base URL to the `run` command:
+
+```bash
+python -m funsearch run examples/worddesign.py 8 --model_name=qwen2.5-coder:14b --ollama_api_base=https://my-ollama.example.com
+```
+
+The `--ollama_api_base` flag sets both `OLLAMA_HOST` and `OLLAMA_API_BASE` so the `llm-ollama` plugin forwards prompts to your cloud endpoint.
+
 ### Analyzing Results 
 After completing a run, you can analyze the results using the run_analyzer.ipynb Jupyter notebook. This notebook provides an exploratory data analysis to get a quick overview over the results. Please refer to the specific eval_datetime.txt for analysis on a specific run.
 
