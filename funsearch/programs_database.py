@@ -106,6 +106,7 @@ class ProgramsDatabase:
         [None] * config.num_islands)
     self._best_scores_per_test_per_island: list[ScoresPerTest | None] = (
         [None] * config.num_islands)
+    self._best_overall_score: float = -float('inf')
 
     self._last_reset_time: float = time.time()
     self._last_best_score_time = time.time()  # Initialize with current time
@@ -119,7 +120,7 @@ class ProgramsDatabase:
   def save(self, file):
     """Save database to a file"""
     data = {}
-    keys = ["_islands", "_best_score_per_island", "_best_program_per_island", "_best_scores_per_test_per_island"]
+    keys = ["_islands", "_best_score_per_island", "_best_program_per_island", "_best_scores_per_test_per_island", "_best_overall_score"]
     for key in keys:
       data[key] = getattr(self, key)
     pickle.dump(data, file)
@@ -170,7 +171,8 @@ class ProgramsDatabase:
       with open('last_eval.txt', 'a') as file:
         file.write(f"****************************************************{island_id}: {score}\n")
 
-      if program_source and best_output_dir:
+      if program_source and best_output_dir and score > self._best_overall_score:
+        self._best_overall_score = score
         best_folder = pathlib.Path(best_output_dir)
         best_folder.mkdir(parents=True, exist_ok=True)
         best_program_path = best_folder / 'program.py'
