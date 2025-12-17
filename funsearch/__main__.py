@@ -50,18 +50,27 @@ class OllamaPassthroughModel:
     self.timeout = timeout
 
   def prompt(self, prompt: str, system: str | None = None, stream: bool = True, **options):
+    """Send a chat-style request and return the whole response content.
+
+    Using /api/chat keeps parity with the llm-ollama plugin and works for cloud
+    or local models. We request non-streaming responses so the downstream
+    sampler receives a single consolidated string.
+    """
+    messages = []
+    if system:
+      messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
         "model": self.model_id,
-        "prompt": prompt,
-        # Use non-streaming so we can return the whole response text consistently.
+        "messages": messages,
         "stream": False,
     }
-    if system:
-      payload["system"] = system
+
     # Allow callers to pass through generation options like temperature, etc.
     payload.update({k: v for k, v in options.items() if v is not None})
 
-    url = f"{self.api_base}/api/generate"
+    url = f"{self.api_base}/api/chat"
     try:
       response = httpx.post(url, json=payload, timeout=self.timeout)
       response.raise_for_status()
@@ -69,7 +78,17 @@ class OllamaPassthroughModel:
       raise RuntimeError(f"Failed to call Ollama at {url}: {exc}") from exc
 
     data = response.json()
-    return _OllamaResponse(data.get("response", ""))
+    content = ""
+
+    # /api/chat returns a top-level "message" object with the text in
+    # "content"; we also fall back to the "response" key used by /api/generate
+    # in case the server answers with that format.
+    if isinstance(data, dict):
+      if isinstance(data.get("message"), dict):
+        content = data["message"].get("content", "")
+      content = content or data.get("response", "")
+
+    return _OllamaResponse(content)
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
