@@ -50,6 +50,7 @@ Guidelines for the LLM:
 - The priority function receives 200+ features about puzzle patterns
 """
 
+import json
 import math
 import numpy as np
 import types
@@ -1149,13 +1150,28 @@ def _embedded_unsolved_puzzle_data():
 RAW_UNSOLVED_PUZZLE_DATA = _embedded_unsolved_puzzle_data()
 
 
-def _load_puzzle_dataset():
-  """Build solved puzzle metadata directly from the inlined dataset."""
+def _load_raw_puzzle_data_from_json(dataset_path=None):
+  """Load raw puzzle data from JSON if provided, else fall back to embedded."""
 
-  try:
-    raw_data = RAW_PUZZLE_DATA
-  except NameError:
-    raw_data = _embedded_raw_puzzle_data()
+  if dataset_path:
+    with open(dataset_path, "r", encoding="utf-8") as f:
+      data = json.load(f)
+
+    if not isinstance(data, list):
+      raise ValueError("Solved puzzle dataset must be a list of entries")
+    return data
+
+  return _embedded_raw_puzzle_data()
+
+
+def _load_puzzle_dataset(raw_data=None):
+  """Build solved puzzle metadata from provided or inlined dataset."""
+
+  if raw_data is None:
+    try:
+      raw_data = RAW_PUZZLE_DATA
+    except NameError:
+      raw_data = _embedded_raw_puzzle_data()
 
   dataset = []
   for entry in raw_data:
@@ -1193,10 +1209,6 @@ def _load_unsolved_puzzle_dataset():
   return dataset
 
 
-PUZZLE_DATA = _load_puzzle_dataset()
-PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
-SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
-
 UNSOLVED_PUZZLE_DATA = _load_unsolved_puzzle_dataset()
 UNSOLVED_METADATA = {entry["bits"]: entry for entry in UNSOLVED_PUZZLE_DATA}
 UNSOLVED_PUZZLES = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA]
@@ -1205,7 +1217,21 @@ UNSOLVED_WITHOUT_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA 
 TARGET_PUZZLES = list(UNSOLVED_PUZZLES)
 # Legacy alias for older callers
 TARGET_PUZZLE = TARGET_PUZZLES[0] if TARGET_PUZZLES else None
-ALL_PUZZLE_METADATA = {**UNSOLVED_METADATA, **PUZZLE_METADATA}
+
+
+def _set_solved_puzzle_data(raw_data):
+  """Update solved puzzle globals using the provided raw dataset."""
+
+  global RAW_PUZZLE_DATA, PUZZLE_DATA, PUZZLE_METADATA, SOLVED_PUZZLES, ALL_PUZZLE_METADATA
+
+  RAW_PUZZLE_DATA = raw_data
+  PUZZLE_DATA = _load_puzzle_dataset(raw_data)
+  PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
+  SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
+  ALL_PUZZLE_METADATA = {**UNSOLVED_METADATA, **PUZZLE_METADATA}
+
+
+_set_solved_puzzle_data(RAW_PUZZLE_DATA)
 
 # ==============================================================================
 # ECC PRIMITIVES (secp256k1)
@@ -1235,9 +1261,7 @@ def _ensure_puzzle_metadata():
     RAW_PUZZLE_DATA = _embedded_raw_puzzle_data()
 
   if "PUZZLE_METADATA" not in globals() or PUZZLE_METADATA is None:
-    PUZZLE_DATA = _load_puzzle_dataset()
-    PUZZLE_METADATA = {entry["bits"]: entry for entry in PUZZLE_DATA}
-    SOLVED_PUZZLES = {entry["bits"]: entry["private_key"] for entry in PUZZLE_DATA}
+    _set_solved_puzzle_data(RAW_PUZZLE_DATA)
 
   if "RAW_UNSOLVED_PUZZLE_DATA" not in globals():
     RAW_UNSOLVED_PUZZLE_DATA = _embedded_unsolved_puzzle_data()
@@ -1253,6 +1277,19 @@ def _ensure_puzzle_metadata():
     UNSOLVED_WITHOUT_PUBLIC_KEYS = [entry["bits"] for entry in UNSOLVED_PUZZLE_DATA if not entry.get("has_public_key")]
 
   ALL_PUZZLE_METADATA = {**UNSOLVED_METADATA, **PUZZLE_METADATA}
+
+
+def load_solved_puzzles(dataset_path=None):
+  """Load solved puzzle data from JSON and refresh globals.
+
+  Args:
+    dataset_path: Optional path to a JSON file containing solved puzzle entries.
+      If not provided, falls back to the inlined dataset for compatibility.
+  """
+
+  raw_data = _load_raw_puzzle_data_from_json(dataset_path)
+  _set_solved_puzzle_data(raw_data)
+  return PUZZLE_DATA
 
   if "TARGET_PUZZLES" not in globals() or not TARGET_PUZZLES:
     TARGET_PUZZLES = list(UNSOLVED_PUZZLES)
@@ -1861,13 +1898,14 @@ import funsearch
 
 
 @funsearch.run
-def evaluate(seed: int) -> float:
+def evaluate(dataset_path: str = "examples/solvedpuzzles.json") -> float:
   """Evaluate a position prediction formula against all solved puzzles.
 
   Tests if the priority function can predict position_ratio for known puzzles.
   Higher score = better predictions across all puzzles.
   """
 
+  load_solved_puzzles(dataset_path)
   _ensure_puzzle_metadata()
 
   # Rebuild globals if needed
