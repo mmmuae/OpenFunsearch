@@ -13,7 +13,7 @@ import importlib
 import importlib.util
 import math
 import pathlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -172,6 +172,78 @@ def compute_predictions(module: Any, min_puzzle: int, min_history: int):
   return metrics
 
 
+def predict_key(
+    module: Any,
+    puzzle_num: int,
+    min_history: int = 5,
+    min_puzzle: int = 10,
+    range_override: Optional[Tuple[float, float]] = None,
+):
+  """Predict the key for a puzzle using the module priority function.
+
+  Args:
+    module: Loaded puzzle module containing SOLVED_PUZZLES, compute_puzzle_features,
+      priority, and get_puzzle_range.
+    puzzle_num: Target puzzle number to score.
+    min_history: Minimum number of solved puzzles required for features.
+    min_puzzle: Minimum puzzle index allowed.
+    range_override: Optional (min, max) range to use instead of get_puzzle_range.
+
+  Returns:
+    A dictionary with prediction details or an error description.
+  """
+
+  solved = module.SOLVED_PUZZLES
+  if puzzle_num < min_puzzle:
+    return {"status": "skipped", "reason": f"puzzle<{min_puzzle}"}
+
+  history = {k: v for k, v in solved.items() if k < puzzle_num}
+  if len(history) < min_history:
+    return {"status": "skipped", "reason": f"< {min_history} prior puzzles"}
+
+  feature_fn = module.compute_puzzle_features
+  ratio_fn = module.get_position_ratio
+  range_fn = module.get_puzzle_range
+  predict_fn = module.priority
+
+  features = feature_fn(puzzle_num, history)
+  predicted_ratio = predict_fn(features)
+
+  if not np.isfinite(predicted_ratio):
+    return {"status": "non-finite"}
+
+  clipped = False
+  if predicted_ratio < 0.0 or predicted_ratio > 1.0:
+    clipped = True
+  predicted_ratio = max(0.0, min(1.0, float(predicted_ratio)))
+
+  if range_override is None:
+    rmin, rmax = range_fn(puzzle_num)
+  else:
+    rmin, rmax = range_override
+
+  rsize = rmax - rmin
+  predicted_key = round(rmin + predicted_ratio * rsize)
+
+  result = {
+      "status": "ok",
+      "puzzle": puzzle_num,
+      "predicted_ratio": predicted_ratio,
+      "predicted_key": predicted_key,
+      "range": (rmin, rmax),
+      "clipped": clipped,
+  }
+
+  if puzzle_num in solved:
+    result.update({
+        "actual_key": solved[puzzle_num],
+        "actual_ratio": ratio_fn(puzzle_num, solved[puzzle_num]),
+        "error": abs(predicted_ratio - ratio_fn(puzzle_num, solved[puzzle_num])),
+    })
+
+  return result
+
+
 def format_report(module: Any, metrics: Dict[str, Any]) -> str:
   lines: List[str] = []
   lines.append("Puzzle prediction analysis")
@@ -242,11 +314,52 @@ def main():
                       help="Path to write the analysis report.")
   parser.add_argument("--min-puzzle", type=int, default=10, help="Skip puzzles below this number.")
   parser.add_argument("--min-history", type=int, default=5, help="Require at least this many prior solved puzzles.")
+  parser.add_argument("--predict", type=int, help="Optional puzzle number to predict a key for.")
+  parser.add_argument("--range", dest="predict_range", nargs=2, type=float,
+                      metavar=("MIN", "MAX"),
+                      help="Override min/max key range (decimals allowed) when predicting a key.")
   args = parser.parse_args()
 
   module = load_module(args.module)
   metrics = compute_predictions(module, min_puzzle=args.min_puzzle, min_history=args.min_history)
   report = format_report(module, metrics)
+
+  if args.predict is not None:
+    if args.predict_range is not None:
+      rmin, rmax = args.predict_range
+      if rmin >= rmax:
+        raise SystemExit("--range must be two numbers where MIN < MAX")
+      range_override: Optional[Tuple[float, float]] = (float(rmin), float(rmax))
+    else:
+      range_override = None
+
+    prediction = predict_key(
+        module,
+        puzzle_num=args.predict,
+        min_history=args.min_history,
+        min_puzzle=args.min_puzzle,
+        range_override=range_override,
+    )
+
+    report += "\n\nPrediction request\n-------------------\n"
+    if prediction.get("status") != "ok":
+      report += f"Prediction unavailable: {prediction.get('status')} ({prediction.get('reason', '')})\n"
+    else:
+      rng = prediction["range"]
+      report += (
+          f"Puzzle #{prediction['puzzle']}\n"
+          f"Range used     : ({rng[0]}, {rng[1]})\n"
+          f"Predicted ratio: {prediction['predicted_ratio']:.6f}\n"
+          f"Predicted key  : {prediction['predicted_key']}\n"
+          f"Clipped output : {prediction['clipped']}\n"
+      )
+      if "actual_key" in prediction:
+        report += (
+            f"Actual key     : {prediction['actual_key']}\n"
+            f"Actual ratio   : {prediction['actual_ratio']:.6f}\n"
+            f"Abs ratio error: {prediction['error']:.6f}\n"
+        )
+
   pathlib.Path(args.output).write_text(report)
   print(f"Analysis written to {args.output}")
 
