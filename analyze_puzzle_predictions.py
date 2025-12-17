@@ -314,36 +314,25 @@ def main():
                       help="Path to write the analysis report.")
   parser.add_argument("--min-puzzle", type=int, default=10, help="Skip puzzles below this number.")
   parser.add_argument("--min-history", type=int, default=5, help="Require at least this many prior solved puzzles.")
-  parser.add_argument("--predict", type=int, help="Optional puzzle number to predict a key for.")
-  parser.add_argument("--range", dest="predict_range", nargs=2, type=float,
-                      metavar=("MIN", "MAX"),
-                      help="Override min/max key range (decimals allowed) when predicting a key.")
+  parser.add_argument("--puzzle", type=int, help="Puzzle number to predict using current SOLVED_PUZZLES data.")
   args = parser.parse_args()
 
   module = load_module(args.module)
   metrics = compute_predictions(module, min_puzzle=args.min_puzzle, min_history=args.min_history)
   report = format_report(module, metrics)
 
-  if args.predict is not None:
-    if args.predict_range is not None:
-      rmin, rmax = args.predict_range
-      if rmin >= rmax:
-        raise SystemExit("--range must be two numbers where MIN < MAX")
-      range_override: Optional[Tuple[float, float]] = (float(rmin), float(rmax))
-    else:
-      range_override = None
-
+  if args.puzzle is not None:
     prediction = predict_key(
         module,
-        puzzle_num=args.predict,
+        puzzle_num=args.puzzle,
         min_history=args.min_history,
         min_puzzle=args.min_puzzle,
-        range_override=range_override,
     )
 
-    report += "\n\nPrediction request\n-------------------\n"
+    report += "\n\nPrediction request\n------------------\n"
     if prediction.get("status") != "ok":
-      report += f"Prediction unavailable: {prediction.get('status')} ({prediction.get('reason', '')})\n"
+      reason = prediction.get("reason", "")
+      report += f"Prediction unavailable: {prediction.get('status')} {reason}\n"
     else:
       rng = prediction["range"]
       report += (
@@ -353,12 +342,6 @@ def main():
           f"Predicted key  : {prediction['predicted_key']}\n"
           f"Clipped output : {prediction['clipped']}\n"
       )
-      if "actual_key" in prediction:
-        report += (
-            f"Actual key     : {prediction['actual_key']}\n"
-            f"Actual ratio   : {prediction['actual_ratio']:.6f}\n"
-            f"Abs ratio error: {prediction['error']:.6f}\n"
-        )
 
   pathlib.Path(args.output).write_text(report)
   print(f"Analysis written to {args.output}")
