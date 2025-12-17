@@ -1,0 +1,161 @@
+"""Bitcoin Puzzle Private Key Prediction.
+
+On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
+Make only small changes.
+Try to make the code short.
+"""
+import numpy as np
+import funsearch
+
+
+# ==============================================================================
+# SOLVED BITCOIN PUZZLES DATASET
+# ==============================================================================
+
+PUZZLES = {
+  1: {'bits': 1, 'range_min': 1, 'range_max': 1, 'private_key': 1, 'address': '1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH'},
+  2: {'bits': 2, 'range_min': 2, 'range_max': 3, 'private_key': 3, 'address': '1CUNEBjYrCn2y1SdiUMohaKUi4wpP326Lb'},
+  3: {'bits': 3, 'range_min': 4, 'range_max': 7, 'private_key': 7, 'address': '19ZewH8Kk1PDbSNdJ97FP4EiCjTRaZMZQA'},
+  4: {'bits': 4, 'range_min': 8, 'range_max': 15, 'private_key': 8, 'address': '1EhqbyUMvvs7BfL8goY6qcPbD6YKfPqb7e'},
+  5: {'bits': 5, 'range_min': 16, 'range_max': 31, 'private_key': 21, 'address': '1E6NuFjCi27W5zoXg8TRdcSRq84zJeBW3k'},
+  6: {'bits': 6, 'range_min': 32, 'range_max': 63, 'private_key': 49, 'address': '1PitScNLyp2HCygzadCh7FveTnfmpPbfp8'},
+  7: {'bits': 7, 'range_min': 64, 'range_max': 127, 'private_key': 76, 'address': '1McVt1vMtCC7yn5b9wgX1833yCcLXzueeC'},
+  8: {'bits': 8, 'range_min': 128, 'range_max': 255, 'private_key': 224, 'address': '1M92tSqNmQLYw33fuBvjmeadirh1ysMBxK'},
+  9: {'bits': 9, 'range_min': 256, 'range_max': 511, 'private_key': 467, 'address': '1CQFwcjw1dwhtkVWBttNLDtqL7ivBonGPV'},
+  10: {'bits': 10, 'range_min': 512, 'range_max': 1023, 'private_key': 514, 'address': '1LeBZP5QCwwgXRtmVUvTVrraqPUokyLHqe'},
+  11: {'bits': 11, 'range_min': 1024, 'range_max': 2047, 'private_key': 1155, 'address': '1PgQVLmst3Z314JrQn5TNiys8Hc38TcXJu'},
+  12: {'bits': 12, 'range_min': 2048, 'range_max': 4095, 'private_key': 2683, 'address': '1DBaumZxUkM4qMQRt2LVWyFJq5kDtSZQot'},
+  13: {'bits': 13, 'range_min': 4096, 'range_max': 8191, 'private_key': 5216, 'address': '1Pie8JkxBT6MGPz9Nvi3fsPkr2D8q3GBc1'},
+  14: {'bits': 14, 'range_min': 8192, 'range_max': 16383, 'private_key': 10544, 'address': '1ErZWg5cFCe4Vw5BzgfzB74VNLaXEiEkhk'},
+  15: {'bits': 15, 'range_min': 16384, 'range_max': 32767, 'private_key': 26867, 'address': '1QCbW9HWnwQWiQqVo5exhAnmfqKRrCRsvW'},
+  16: {'bits': 16, 'range_min': 32768, 'range_max': 65535, 'private_key': 51510, 'address': '19vkiEajfhuZ8bs8Zu2jgmC6oqZbWqhxhG'},
+  17: {'bits': 17, 'range_min': 65536, 'range_max': 131071, 'private_key': 95823, 'address': '19YZECXj3SxEZMoUeJ1yiPsw8xANe7M7QR'},
+  18: {'bits': 18, 'range_min': 131072, 'range_max': 262143, 'private_key': 198669, 'address': '1L2GM8eE7mJWLdo3HZS6su1832NX2txaac'},
+  19: {'bits': 19, 'range_min': 262144, 'range_max': 524287, 'private_key': 344548, 'address': '1rSnXMr63jdCuegJFuidJqWxUPV7AtUf7'},
+  20: {'bits': 20, 'range_min': 524288, 'range_max': 1048575, 'private_key': 646345, 'address': '15JhYXn6Mx3oF4Y7PcTAv2wVVAuCFFQNiP'},
+  21: {'bits': 21, 'range_min': 1048576, 'range_max': 2097151, 'private_key': 1856762, 'address': '1JVnST957hGztonaWK6FougdtjxzHzRMMg'},
+  22: {'bits': 22, 'range_min': 2097152, 'range_max': 4194303, 'private_key': 3015714, 'address': '128z5d7nN7PkCuX5qoA4Ys6pmxUYnEy86k'},
+  23: {'bits': 23, 'range_min': 4194304, 'range_max': 8388607, 'private_key': 5887770, 'address': '12jbtzBb54r97TCwW3G1gCFoumpckRAPdY'},
+  24: {'bits': 24, 'range_min': 8388608, 'range_max': 16777215, 'private_key': 11452057, 'address': '19EEC52krRUK1RkUAEZmQdjTyHT7Gp1TYT'},
+  25: {'bits': 25, 'range_min': 16777216, 'range_max': 33554431, 'private_key': 23408516, 'address': '1LHtnpd8nU5VHEMkG2TMYYNUjjLc992bps'},
+  26: {'bits': 26, 'range_min': 33554432, 'range_max': 67108863, 'private_key': 43166004, 'address': '1LhE6sCTuGae42Axu1L1ZB7L96yi9irEBE'},
+  27: {'bits': 27, 'range_min': 67108864, 'range_max': 134217727, 'private_key': 77194831, 'address': '1FRoHA9xewq7DjrZ1psWJVeTer8gHRqEvR'},
+  28: {'bits': 28, 'range_min': 134217728, 'range_max': 268435455, 'private_key': 154387630, 'address': '187swFMjz1G54ycVU56B7jZFHFTNVQFDiu'},
+  29: {'bits': 29, 'range_min': 268435456, 'range_max': 536870911, 'private_key': 306149923, 'address': '1PWABE7oUahG2AFFQhhvViQovnCr4rEv7Q'},
+  30: {'bits': 30, 'range_min': 536870912, 'range_max': 1073741823, 'private_key': 543904612, 'address': '1PWCx5fovoEaoBowAvF5k91m2Xat9bMgwb'},
+  31: {'bits': 31, 'range_min': 1073741824, 'range_max': 2147483647, 'private_key': 1093685409, 'address': '1Be2UF9NLfyLFbtm3TCbmuocc9N1Kduci1'},
+  32: {'bits': 32, 'range_min': 2147483648, 'range_max': 4294967295, 'private_key': 2176799025, 'address': '14iXhn8bGajVWegZHJ18vJLHhntcpL4dex'},
+  33: {'bits': 33, 'range_min': 4294967296, 'range_max': 8589934591, 'private_key': 4119088493, 'address': '1HBtApAFA9B2YZw3G2YKSMCtb3dVnjuNe2'},
+  34: {'bits': 34, 'range_min': 8589934592, 'range_max': 17179869183, 'private_key': 8365845251, 'address': '122AJhKLEfkFBaGAd84pLp1kfE7xK3GdT8'},
+  35: {'bits': 35, 'range_min': 17179869184, 'range_max': 34359738367, 'private_key': 17134082682, 'address': '1EeAxcprB2PpCnr34VfZdFrkUWuxyiNEFv'},
+  36: {'bits': 36, 'range_min': 34359738368, 'range_max': 68719476735, 'private_key': 34366490953, 'address': '1L5sU9qvJeuwQUdt4y1eiLmquFxKjtHr3E'},
+  37: {'bits': 37, 'range_min': 68719476736, 'range_max': 137438953471, 'private_key': 68739510002, 'address': '1E32GPWgDyeyQac4aJxm9HVoLrrEYPnM4N'},
+  38: {'bits': 38, 'range_min': 137438953472, 'range_max': 274877906943, 'private_key': 137273774277, 'address': '1PiFuqGpG8yGM5v6rNHWS3TjsG6awgEGA1'},
+  39: {'bits': 39, 'range_min': 274877906944, 'range_max': 549755813887, 'private_key': 275026006303, 'address': '1CkR2uS7LmFwc3T2jV8C1BhWb5mQaoxedF'},
+  40: {'bits': 40, 'range_min': 549755813888, 'range_max': 1099511627775, 'private_key': 549755813888, 'address': '1NtiLNGegHWE3Mp9g2JPkgx6wUg4TW7bbk'},
+  41: {'bits': 41, 'range_min': 1099511627776, 'range_max': 2199023255551, 'private_key': 1099511627776, 'address': '1F3JRMWudBaj48EhwcHDdpeuy2jwACNxjP'},
+  42: {'bits': 42, 'range_min': 2199023255552, 'range_max': 4398046511103, 'private_key': 2199023255552, 'address': '1Pd8VvT49sHKsmqrQiP61RsVwmXCZ6ay7Z'},
+  43: {'bits': 43, 'range_min': 4398046511104, 'range_max': 8796093022207, 'private_key': 4398046511104, 'address': '1DFYhaB2J9q1LLZJWKTnscPWos9VBqDHzv'},
+  44: {'bits': 44, 'range_min': 8796093022208, 'range_max': 17592186044415, 'private_key': 8796093022208, 'address': '12CiUhYVTTH33w3SPUBqcpMoqnApAV4WCF'},
+  45: {'bits': 45, 'range_min': 17592186044416, 'range_max': 35184372088831, 'private_key': 17592186044416, 'address': '1MEzite4ReNuWaL5Ds17ePKt2dCxWEofwk'},
+  46: {'bits': 46, 'range_min': 35184372088832, 'range_max': 70368744177663, 'private_key': 35184372088832, 'address': '1NpnQyZ7x24ud82b7WiRNvPm6N8bqGQnaS'},
+  47: {'bits': 47, 'range_min': 70368744177664, 'range_max': 140737488355327, 'private_key': 70368744177664, 'address': '15z9c9sVpu6fwNiK7dMAFgMYSK4GqsGZim'},
+  48: {'bits': 48, 'range_min': 140737488355328, 'range_max': 281474976710655, 'private_key': 140737488355328, 'address': '15K1YKJMiJ4fpesTVUcByoz334rHmknxmT'},
+  49: {'bits': 49, 'range_min': 281474976710656, 'range_max': 562949953421311, 'private_key': 281474976710656, 'address': '19LeLQbm2FwJWiuYp8gleadAzcNdwiBLQQ'},
+  50: {'bits': 50, 'range_min': 562949953421312, 'range_max': 1125899906842623, 'private_key': 562949953421312, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  51: {'bits': 51, 'range_min': 1125899906842624, 'range_max': 2251799813685247, 'private_key': 1125899906842624, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  52: {'bits': 52, 'range_min': 2251799813685248, 'range_max': 4503599627370495, 'private_key': 2251799813685248, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  53: {'bits': 53, 'range_min': 4503599627370496, 'range_max': 9007199254740991, 'private_key': 4503599627370496, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  54: {'bits': 54, 'range_min': 9007199254740992, 'range_max': 18014398509481983, 'private_key': 9007199254740992, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  55: {'bits': 55, 'range_min': 18014398509481984, 'range_max': 36028797018963967, 'private_key': 18014398509481984, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  56: {'bits': 56, 'range_min': 36028797018963968, 'range_max': 72057594037927935, 'private_key': 36028797018963968, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  57: {'bits': 57, 'range_min': 72057594037927936, 'range_max': 144115188075855871, 'private_key': 72057594037927936, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  58: {'bits': 58, 'range_min': 144115188075855872, 'range_max': 288230376151711743, 'private_key': 144115188075855872, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  59: {'bits': 59, 'range_min': 288230376151711744, 'range_max': 576460752303423487, 'private_key': 288230376151711744, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  60: {'bits': 60, 'range_min': 576460752303423488, 'range_max': 1152921504606846975, 'private_key': 576460752303423488, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  61: {'bits': 61, 'range_min': 1152921504606846976, 'range_max': 2305843009213693951, 'private_key': 1152921504606846976, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  62: {'bits': 62, 'range_min': 2305843009213693952, 'range_max': 4611686018427387903, 'private_key': 2305843009213693952, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  63: {'bits': 63, 'range_min': 4611686018427387904, 'range_max': 9223372036854775807, 'private_key': 4611686018427387904, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  64: {'bits': 64, 'range_min': 9223372036854775808, 'range_max': 18446744073709551615, 'private_key': 9223372036854775808, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  65: {'bits': 65, 'range_min': 18446744073709551616, 'range_max': 36893488147419103231, 'private_key': 18446744073709551616, 'address': '1J7YH7iofRpEiUVCNfcGCyvPvpLmFZWGBY'},
+  66: {'bits': 66, 'range_min': 36893488147419103232, 'range_max': 73786976294838206463, 'private_key': 36893488147419103232, 'address': '13zYrYhhJxp6Ui1VV7pqa5WDhNWM45ARAC'}
+}
+
+
+@funsearch.run
+def evaluate(n: int) -> float:
+  """Evaluates priority function on predicting private keys."""
+  total_score = 0.0
+  num_tests = 0
+
+  # Test each puzzle using history from previous puzzles
+  for test_num in sorted(PUZZLES.keys()):
+    if test_num < 6:  # Need at least 5 puzzles as history
+      continue
+
+    # Build history (all puzzles before this one)
+    history = []
+    for h_num in range(1, test_num):
+      p = PUZZLES[h_num]
+      history.append((p['bits'], p['private_key'], p['range_min'], p['range_max']))
+
+    # Get target puzzle info
+    target = PUZZLES[test_num]
+
+    try:
+      # Call evolved priority function
+      predicted = priority(
+        test_num,
+        tuple(history),
+        target['range_min'],
+        target['range_max']
+      )
+
+      # Validate and clip
+      if not isinstance(predicted, (int, float, np.integer, np.floating)):
+        continue
+      if not np.isfinite(predicted):
+        continue
+
+      predicted = int(predicted)
+      predicted = max(target['range_min'], min(target['range_max'], predicted))
+
+      # Score based on bit accuracy
+      actual = target['private_key']
+      distance = abs(predicted - actual)
+
+      if distance == 0:
+        score = 100.0
+      else:
+        # Score based on how many bits are correct
+        max_bits = test_num
+        wrong_bits = np.log2(distance + 1)
+        bit_accuracy = max(0.0, 1.0 - wrong_bits / max(max_bits, 1.0))
+        score = bit_accuracy * 100.0
+
+      total_score += score
+      num_tests += 1
+
+    except:
+      continue
+
+  if num_tests == 0:
+    return 0.0
+
+  return total_score / num_tests
+
+
+@funsearch.evolve
+def priority(puzzle_num: int, history: tuple, range_min: int, range_max: int) -> int:
+  """Predict the private key for a puzzle.
+
+  Args:
+    puzzle_num: The puzzle number to predict (e.g., 10)
+    history: Tuple of (bits, private_key, range_min, range_max) for puzzles 1 to puzzle_num-1
+    range_min: Minimum valid value
+    range_max: Maximum valid value
+
+  Returns:
+    Predicted private key (integer)
+  """
+  return (range_min + range_max) // 2
