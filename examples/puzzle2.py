@@ -24,15 +24,47 @@ WHAT YOU GET:
 WHAT YOU RETURN:
 - Your predicted private key for puzzle N (integer)
 
-SCORING:
-Your solution is scored based on:
-1. DISTANCE: How close your predicted key is to the actual key (log scale)
-2. DIFFICULTY: Higher puzzle numbers are exponentially more valuable
-3. COVERAGE: Successfully predict keys for most puzzles
-4. PRECISION: Bonus for getting very close or exact matches
+SCORING SYSTEM (Maximum: 1000 points):
+==========================================
 
-The reward system heavily favors getting closer to the actual key,
-with exponential bonuses for each bit of accuracy you gain.
+1. PER-PUZZLE SCORE (0-100 points each):
+   - Based on bit-level accuracy using logarithmic distance
+   - Exponential reward: 2^(10 * bit_accuracy) normalized to 0-100
+   - Perfect match = 100 points
+   - Half the bits correct ≈ 3 points
+   - No bits correct = 0 points
+
+2. DIFFICULTY WEIGHTING:
+   - Each puzzle weighted by its puzzle number (bits)
+   - Puzzle 66 weighted 11x more than puzzle 6
+   - Uses weighted average, not simple mean
+   - Prevents gaming by solving only one hard puzzle
+
+3. COVERAGE MULTIPLIER:
+   - Simple linear scaling from 0% to 100% coverage
+   - 0% coverage: 0.0x multiplier
+   - 50% coverage: 0.5x multiplier
+   - 100% coverage: 1.0x multiplier (full score)
+
+4. FAIRNESS EXAMPLES:
+   - Solution A: Gets puzzle 66 perfect (100 pts) but fails rest
+     → Weighted score ≈ 3, coverage ~2% → Final: ~0.6
+
+   - Solution B: Gets puzzles 6-60 perfect (100 pts each)
+     → Weighted score = 100, coverage 100% → Final: 1000
+
+   - Solution C: Gets all puzzles with 50% bit accuracy
+     → Weighted score ≈ 3, coverage 100% → Final: 30
+
+5. FINAL CALCULATION:
+   Final Score = Weighted_Mean_Score × 10 × Coverage_Multiplier
+   Maximum: 100 × 10 × 1.0 = 1000 points
+
+The system rewards:
+- Consistent accuracy across many puzzles (coverage)
+- Getting closer to actual keys (bit-level accuracy)
+- Success on harder puzzles (difficulty weighting)
+- Cannot be gamed by cherry-picking single puzzles
 """
 
 import math
@@ -135,12 +167,17 @@ import funsearch
 def evaluate(seed: int) -> float:
   """Evaluate a private key prediction function against all solved puzzles.
 
-  SCORING SYSTEM:
-  - Measures how close predicted keys are to actual keys
-  - Uses logarithmic distance metric (bit accuracy)
-  - Exponentially rewards getting closer to the actual key
-  - Difficulty weighting: higher puzzles are more valuable
-  - Coverage requirement: must successfully predict for most puzzles
+  SCORING SYSTEM (Maximum: 1000 points):
+  - Per-puzzle score: 0-100 points based on bit-level accuracy
+  - Difficulty weighting: Harder puzzles (higher bits) weighted more in average
+  - Coverage multiplier: Linear 0-100% (no harsh cutoffs)
+  - Balanced: Can't game system by only solving one hard puzzle
+
+  FAIRNESS:
+  - Getting puzzle 66 right = 100 points (weighted heavily)
+  - Getting puzzles 1-60 right = 100 points each (weighted by difficulty)
+  - Coverage scales linearly - 50% coverage = 50% of score
+  - Weighted average prevents cherry-picking single hard puzzles
   """
 
   all_puzzles = _get_puzzle_data()
@@ -150,10 +187,13 @@ def evaluate(seed: int) -> float:
   min_history = 5
   min_test_puzzle = min_history + 1
 
-  per_puzzle_scores = []
-  total_bit_accuracy = 0.0
+  # Track weighted scores for difficulty-adjusted averaging
+  weighted_score_sum = 0.0
+  weight_sum = 0.0
+
   evaluated_count = 0
   eligible_count = 0
+  failed_puzzles = 0
 
   for test_puzzle_num in puzzle_nums:
     if test_puzzle_num < min_test_puzzle:
@@ -176,15 +216,18 @@ def evaluate(seed: int) -> float:
       # Call the evolved priority function
       predicted_key = priority(input_data)
 
-      # Validate output
+      # Validate output type
       if not isinstance(predicted_key, (int, float)):
-        per_puzzle_scores.append(-100.0)
+        failed_puzzles += 1
         evaluated_count += 1
+        # Assign 0 score for this puzzle (still counts for coverage)
+        weight_sum += test_puzzle_num
         continue
 
       if not np.isfinite(predicted_key):
-        per_puzzle_scores.append(-100.0)
+        failed_puzzles += 1
         evaluated_count += 1
+        weight_sum += test_puzzle_num
         continue
 
       # Convert to integer
@@ -194,87 +237,78 @@ def evaluate(seed: int) -> float:
       range_min = all_puzzles[test_puzzle_num]['range_min']
       range_max = all_puzzles[test_puzzle_num]['range_max']
 
-      # Clip to valid range (with penalty)
-      clipping_penalty = 0.0
-      if predicted_key < range_min or predicted_key > range_max:
-        clipping_penalty = 20.0
+      # Check if clipping needed (small penalty applied later)
+      needs_clipping = (predicted_key < range_min or predicted_key > range_max)
       predicted_key = max(range_min, min(range_max, predicted_key))
 
       # Get actual key
       actual_key = all_puzzles[test_puzzle_num]['private_key']
 
-      # === SCORING BASED ON DISTANCE ===
+      # === PER-PUZZLE SCORE (0-100 points) ===
 
       # Calculate absolute distance
       distance = abs(predicted_key - actual_key)
 
-      # Exact match bonus
       if distance == 0:
-        puzzle_score = 10000.0  # Massive reward for exact match!
+        # Perfect prediction!
+        puzzle_score = 100.0
       else:
-        # Use logarithmic distance (how many bits off are we?)
-        # log2(distance + 1) tells us roughly how many bits differ
+        # Bit-level accuracy scoring
+        # log2(distance + 1) tells us how many bits differ
         log_distance = math.log2(distance + 1)
-        max_log_distance = test_puzzle_num  # Maximum possible bit difference
+        max_log_distance = float(test_puzzle_num)  # Maximum possible bit error
 
-        # Bit accuracy (0 to 1, where 1 is perfect)
-        bit_accuracy = max(0.0, 1.0 - (log_distance / max(max_log_distance, 1)))
-        total_bit_accuracy += bit_accuracy
+        # Bit accuracy: fraction of bits correct (0.0 to 1.0)
+        bit_accuracy = max(0.0, 1.0 - (log_distance / max(max_log_distance, 1.0)))
 
-        # Exponential scoring: reward getting each bit correct
-        # Score increases exponentially as we get more bits right
-        puzzle_score = 100.0 * (2.0 ** (bit_accuracy * 10.0) - 1.0)
+        # Exponential reward: 2^(10 * bit_accuracy)
+        # Perfect (1.0) -> 2^10 = 1024 -> 100 points
+        # Half bits correct (0.5) -> 2^5 = 32 -> ~3 points
+        # No bits correct (0.0) -> 2^0 = 1 -> 0 points
+        puzzle_score = 100.0 * ((2.0 ** (10.0 * bit_accuracy)) - 1.0) / 1023.0
 
-        # Difficulty multiplier (harder puzzles are more valuable)
-        difficulty_weight = 1.0 + (test_puzzle_num / 20.0)
-        puzzle_score *= difficulty_weight
+        # Small penalty for needing clipping
+        if needs_clipping:
+          puzzle_score *= 0.95  # 5% penalty
 
-        # Precision bonuses
-        relative_distance = distance / max(actual_key, 1)
-        if relative_distance < 0.0001:  # Within 0.01%
-          puzzle_score += 500.0
-        elif relative_distance < 0.001:  # Within 0.1%
-          puzzle_score += 200.0
-        elif relative_distance < 0.01:  # Within 1%
-          puzzle_score += 100.0
-        elif relative_distance < 0.1:  # Within 10%
-          puzzle_score += 50.0
+      # Weight this puzzle by its difficulty (higher puzzle number = higher weight)
+      puzzle_weight = float(test_puzzle_num)
 
-        # Apply clipping penalty
-        puzzle_score -= clipping_penalty
-
-      per_puzzle_scores.append(puzzle_score)
+      weighted_score_sum += puzzle_score * puzzle_weight
+      weight_sum += puzzle_weight
       evaluated_count += 1
 
     except Exception as e:
-      # Penalize crashes heavily
-      per_puzzle_scores.append(-200.0)
+      # Exception during evaluation - count as failed
+      failed_puzzles += 1
       evaluated_count += 1
+      weight_sum += test_puzzle_num  # Still count weight for coverage
+      continue
 
-  # === FINAL SCORE CALCULATION ===
+  # === FINAL SCORE CALCULATION (0-1000) ===
 
-  if evaluated_count == 0:
-    return -2000.0  # Catastrophic failure
+  # Must have attempted all eligible puzzles
+  if evaluated_count == 0 or eligible_count == 0:
+    return 0.0
 
-  # Coverage ratio
-  coverage = evaluated_count / max(1, eligible_count)
+  # Coverage: fraction of puzzles successfully evaluated
+  coverage = float(evaluated_count) / float(eligible_count)
 
-  # Mean per-puzzle score
-  mean_score = float(np.mean(per_puzzle_scores)) if per_puzzle_scores else -200.0
+  # Calculate weighted mean score (0-100 scale)
+  if weight_sum > 0:
+    weighted_mean_score = weighted_score_sum / weight_sum
+  else:
+    weighted_mean_score = 0.0
 
-  # Coverage penalty
-  coverage_penalty = 0.0
-  if coverage < 0.8:
-    coverage_penalty = 500.0 * (0.8 - coverage)
+  # Coverage multiplier: Simple linear scaling (0 to 1)
+  # 0% coverage = 0.0x, 50% coverage = 0.5x, 100% coverage = 1.0x
+  coverage_multiplier = coverage
 
-  # Average bit accuracy bonus
-  avg_bit_accuracy = total_bit_accuracy / max(1, evaluated_count)
-  bit_accuracy_bonus = avg_bit_accuracy * 200.0
+  # Final score: weighted mean (0-100) * 10 * coverage multiplier
+  # Maximum: 100 * 10 * 1.0 = 1000 points
+  final_score = weighted_mean_score * 10.0 * coverage_multiplier
 
-  # Final score
-  final_score = mean_score + bit_accuracy_bonus - coverage_penalty
-
-  return float(final_score)
+  return float(max(0.0, final_score))
 
 
 @funsearch.evolve
