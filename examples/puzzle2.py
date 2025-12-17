@@ -1,70 +1,52 @@
-"""
-Bitcoin Puzzle Private Key Discovery - Open-Ended Approach
+"""Bitcoin Puzzle Private Key Discovery - Open-Ended Approach
+
+On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
 
 GOAL:
 Discover the actual private key for puzzle N using ANY method you can imagine.
 
-This is a completely open-ended challenge. You can use:
-- Mathematical pattern analysis
-- Number theory and modular arithmetic
-- Cryptographic analysis and attacks
-- Elliptic curve cryptography exploits
-- Statistical methods and machine learning
-- Chaos theory, fractals, or any other approach
-- Hybrid combinations of multiple methods
 
-NO CONSTRAINTS. NO PRESCRIBED METHODS. PURE DISCOVERY.
+This is a completely open-ended challenge. You can use:
+1) Discrete structure (algebra/number theory)
+Modular structure, CRT, continued fractions
+
+2) Dynamics (time evolution / chaos)
+Dynamical systems, chaos, symbolic dynamics, ergodic ideas, fractal/self-similar analysis
+
+3) Spectral / multiscale signal lens
+Fourier/spectral intuition, phase cues, wavelets, time–frequency methods
+
+4) Statistical learning lens
+Robust statistics, rank statistics, kernel methods, ML models
+
+5) Shape-of-data lens (geometry/topology)
+Manifold/geometry intuition, topological viewpoints, TDA
+
+6) Simplicity / compression lens
+Information theory, MDL, Kolmogorov/algorithmic complexity
+
+7) Latent regime lens (state models)
+Automata intuition, state machines, HMMs, regime switching
+
+8) Blending / ensembling lens
+Bayesian model averaging, hybrid combinations, model stacking (as a concept)
+
+9) Crypto-specific lens
+Cryptographic analysis/attacks, ECC-focused analysis, lattice reduction
+
 
 WHAT YOU GET:
 - Puzzle number N to solve
-- Complete historical data of all previously solved puzzles
+- Complete historical data of all previously solved puzzles for training and validation
 - For each puzzle: private_key, public_key, address, range_min, range_max
 - Full access to all cryptographic metadata
 
+- Always return a single, complete Python module starting at column 0
+- Only adjust the body of ``priority``; keep function signatures unchanged
+- Use **two spaces** per indentation level
+
 WHAT YOU RETURN:
 - Your predicted private key for puzzle N (integer)
-
-SCORING SYSTEM (Maximum: 1000 points):
-==========================================
-
-1. PER-PUZZLE SCORE (0-100 points each):
-   - Based on bit-level accuracy using logarithmic distance
-   - Exponential reward: 2^(10 * bit_accuracy) normalized to 0-100
-   - Perfect match = 100 points
-   - Half the bits correct ≈ 3 points
-   - No bits correct = 0 points
-
-2. DIFFICULTY WEIGHTING:
-   - Each puzzle weighted by its puzzle number (bits)
-   - Puzzle 66 weighted 11x more than puzzle 6
-   - Uses weighted average, not simple mean
-   - Prevents gaming by solving only one hard puzzle
-
-3. COVERAGE MULTIPLIER:
-   - Simple linear scaling from 0% to 100% coverage
-   - 0% coverage: 0.0x multiplier
-   - 50% coverage: 0.5x multiplier
-   - 100% coverage: 1.0x multiplier (full score)
-
-4. FAIRNESS EXAMPLES:
-   - Solution A: Gets puzzle 66 perfect (100 pts) but fails rest
-     → Weighted score ≈ 3, coverage ~2% → Final: ~0.6
-
-   - Solution B: Gets puzzles 6-60 perfect (100 pts each)
-     → Weighted score = 100, coverage 100% → Final: 1000
-
-   - Solution C: Gets all puzzles with 50% bit accuracy
-     → Weighted score ≈ 3, coverage 100% → Final: 30
-
-5. FINAL CALCULATION:
-   Final Score = Weighted_Mean_Score × 10 × Coverage_Multiplier
-   Maximum: 100 × 10 × 1.0 = 1000 points
-
-The system rewards:
-- Consistent accuracy across many puzzles (coverage)
-- Getting closer to actual keys (bit-level accuracy)
-- Success on harder puzzles (difficulty weighting)
-- Cannot be gamed by cherry-picking single puzzles
 """
 
 import math
