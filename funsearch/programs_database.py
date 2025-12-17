@@ -106,6 +106,7 @@ class ProgramsDatabase:
         [None] * config.num_islands)
     self._best_scores_per_test_per_island: list[ScoresPerTest | None] = (
         [None] * config.num_islands)
+    self._best_overall_score: float = -float('inf')
 
     self._last_reset_time: float = time.time()
     self._last_best_score_time = time.time()  # Initialize with current time
@@ -119,7 +120,7 @@ class ProgramsDatabase:
   def save(self, file):
     """Save database to a file"""
     data = {}
-    keys = ["_islands", "_best_score_per_island", "_best_program_per_island", "_best_scores_per_test_per_island"]
+    keys = ["_islands", "_best_score_per_island", "_best_program_per_island", "_best_scores_per_test_per_island", "_best_overall_score"]
     for key in keys:
       data[key] = getattr(self, key)
     pickle.dump(data, file)
@@ -153,6 +154,8 @@ class ProgramsDatabase:
       program: code_manipulation.Function,
       island_id: int,
       scores_per_test: ScoresPerTest,
+      program_source: str | None = None,
+      best_output_dir: pathlib.Path | None = None,
   ) -> None:
     """Registers `program` in the specified island."""
     self._islands[island_id].register_program(program, scores_per_test)
@@ -167,12 +170,21 @@ class ProgramsDatabase:
       logging.info(f'Best score of island {island_id} increased to {score}, time elapsed: {elapsed_time:.2f} minutes')
       with open('last_eval.txt', 'a') as file:
         file.write(f"****************************************************{island_id}: {score}\n")
-  
+
+      if program_source and best_output_dir and score > self._best_overall_score:
+        self._best_overall_score = score
+        best_folder = pathlib.Path(best_output_dir)
+        best_folder.mkdir(parents=True, exist_ok=True)
+        best_program_path = best_folder / 'program.py'
+        best_program_path.write_text(program_source)
+
   def register_program(
       self,
       program: code_manipulation.Function,
       island_id: int | None,
       scores_per_test: ScoresPerTest,
+      program_source: str | None = None,
+      best_output_dir: pathlib.Path | None = None,
   ) -> None:
     """Registers `program` in the database."""
     # In an asynchronous implementation we should consider the possibility of
@@ -181,9 +193,19 @@ class ProgramsDatabase:
     if island_id is None:
       # This is a program added at the beginning, so adding it to all islands.
       for island_id in range(len(self._islands)):
-        self._register_program_in_island(program, island_id, scores_per_test)
+        self._register_program_in_island(
+            program,
+            island_id,
+            scores_per_test,
+            program_source,
+            best_output_dir)
     else:
-      self._register_program_in_island(program, island_id, scores_per_test)
+      self._register_program_in_island(
+          program,
+          island_id,
+          scores_per_test,
+          program_source,
+          best_output_dir)
 
     # Check whether it is time to reset an island.
     if (time.time() - self._last_reset_time > self._config.reset_period):

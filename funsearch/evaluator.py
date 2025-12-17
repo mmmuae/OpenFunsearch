@@ -177,4 +177,13 @@ class Evaluator:
           raise ValueError('@function.run did not return an int/float score.')
         scores_per_test[current_input] = test_output
     if scores_per_test:
-      self._database.register_program(new_function, island_id, scores_per_test)
+      best_output_dir = None
+      if hasattr(self._sandbox, 'output_path'):
+        best_output_dir = self._sandbox.output_path / "Best"
+
+      self._database.register_program(
+          new_function,
+          island_id,
+          scores_per_test,
+          program,
+          best_output_dir)
