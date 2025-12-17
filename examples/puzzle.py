@@ -2118,5 +2118,28 @@ def priority(features: dict) -> float:
   trans_hint = combined_digit / 10.0
   pred = pred * 0.9 + trans_hint * 0.1
 
+  # Introduce a new recursive pattern using a simple non-linear recurrence
+  # Inspired by logistic map or similar chaotic systems
+  try:
+    # Get some historical data for the recurrence
+    history = [pos_n_minus_1]
+    if pos_n_minus_2 is not None:
+      history.append(pos_n_minus_2)
+
+    # Use a simple chaotic map for small perturbations
+    # This is a minimal attempt to detect a hidden dynamical system
+    if len(history) >= 2:
+      # Logistic-like behavior
+      r = 3.7  # Feigenbaum constant or similar
+      x = history[-1]
+      x_next = r * x * (1 - x)
+      # Mix with existing prediction
+      pred = pred * 0.8 + x_next * 0.2
+  except Exception:
+    pass  # Silently continue if error occurs
+
+  # Normalize to [0,1] range
+  pred = max(0.0, min(1.0, pred))
+
   return float(pred)
 

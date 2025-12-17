@@ -144,7 +144,8 @@ def main(ctx):
 @click.option('--iterations', default=-1, type=click.INT, help='Max iterations per sampler')
 @click.option('--samplers', default=15, type=click.INT, help='Samplers')
 @click.option('--sandbox_type', default="ContainerSandbox", type=click.Choice(SANDBOX_NAMES), help='Sandbox type')
-def run(spec_file, inputs, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
+@click.option('--ollama_api_base', default=None, help='Base URL for Ollama API (e.g. https://api.ollama.ai)')
+def run(spec_file, inputs, model_name, output_path, load_backup, iterations, samplers, sandbox_type, ollama_api_base):
   """ Execute function-search algorithm:
 
 \b
@@ -187,6 +188,11 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
     # Only do this automatically for Ollama model names.
     if ':' in model_name:
       os.environ.setdefault('LLM_LOAD_PLUGINS', 'llm-ollama')
+
+      # Allow using remote Ollama instances instead of only local ones.
+      if ollama_api_base:
+        os.environ.setdefault('OLLAMA_HOST', ollama_api_base)
+        os.environ.setdefault('OLLAMA_API_BASE', ollama_api_base)
 
     # Import llm here after setting environment variables
     import llm
