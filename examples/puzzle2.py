@@ -1,52 +1,25 @@
-"""Bitcoin Puzzle Private Key Discovery - Open-Ended Approach
+"""Bitcoin Puzzle Private Key Discovery - guided FunSearch prompt
 
-On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
+This version mirrors the concise, easy-to-edit structure used by the other
+examples.  The goal is still open-ended (predict the private key for puzzle N),
+but we steer the model toward producing actual code inside ``priority`` by:
+- Keeping instructions short and specific
+- Providing a simple, working baseline
+- Making it clear that only the body of ``priority`` should change
+- Using small helper utilities the model can safely remix
 
-GOAL:
-Discover the actual private key for puzzle N using ANY method you can imagine.
+WHAT YOU GET
+- puzzle_num, range_min, range_max
+- history of solved puzzles with metadata (private_key, address, public_key, ...)
 
+WHAT TO DO
+- Implement logic inside ``priority`` that maps puzzle_num + history -> key
+- Stay within the provided [range_min, range_max]
+- Return an integer (float is OK; it will be cast to int)
 
-This is a completely open-ended challenge. You can use:
-1) Discrete structure (algebra/number theory)
-Modular structure, CRT, continued fractions
-
-2) Dynamics (time evolution / chaos)
-Dynamical systems, chaos, symbolic dynamics, ergodic ideas, fractal/self-similar analysis
-
-3) Spectral / multiscale signal lens
-Fourier/spectral intuition, phase cues, wavelets, time–frequency methods
-
-4) Statistical learning lens
-Robust statistics, rank statistics, kernel methods, ML models
-
-5) Shape-of-data lens (geometry/topology)
-Manifold/geometry intuition, topological viewpoints, TDA
-
-6) Simplicity / compression lens
-Information theory, MDL, Kolmogorov/algorithmic complexity
-
-7) Latent regime lens (state models)
-Automata intuition, state machines, HMMs, regime switching
-
-8) Blending / ensembling lens
-Bayesian model averaging, hybrid combinations, model stacking (as a concept)
-
-9) Crypto-specific lens
-Cryptographic analysis/attacks, ECC-focused analysis, lattice reduction
-
-
-WHAT YOU GET:
-- Puzzle number N to solve
-- Complete historical data of all previously solved puzzles for training and validation
-- For each puzzle: private_key, public_key, address, range_min, range_max
-- Full access to all cryptographic metadata
-
-- Always return a single, complete Python module starting at column 0
-- Only adjust the body of ``priority``; keep function signatures unchanged
-- Use **two spaces** per indentation level
-
-WHAT YOU RETURN:
-- Your predicted private key for puzzle N (integer)
+WHY THESE GUARDRAILS
+- Previous prompt led to empty priority sections in generated code
+- This streamlined version matches working patterns in other examples
 """
 
 import math
@@ -335,8 +308,45 @@ def priority(input_data: dict) -> int:
   range_min = input_data['range_min']
   range_max = input_data['range_max']
 
-  # Simple baseline: use range midpoint
-  # OpenFunSearch will evolve this into something much more sophisticated!
-  prediction = (range_min + range_max) // 2
+  # --- Feature extraction from history (works even with sparse data) ---
+  bit_levels = []
+  ratios = []
+  deltas = []
+  for p_num, info in sorted(history.items()):
+    span = max(1, info['range_max'] - info['range_min'])
+    ratio = (info['private_key'] - info['range_min']) / span
+    ratio = float(np.clip(ratio, 0.0, 1.0))
+    bit_levels.append(float(info['bits']))
+    ratios.append(ratio)
+    deltas.append(info['private_key'] - info['range_min'])
 
-  return prediction
+  if not ratios:
+    return (range_min + range_max) // 2
+
+  bit_levels = np.array(bit_levels, dtype=float)
+  ratios = np.array(ratios, dtype=float)
+
+  # --- Robust trend estimate (fits line, shrinks toward mean for stability) ---
+  mean_ratio = float(np.mean(ratios))
+  if len(ratios) >= 2:
+    coef = np.polyfit(bit_levels, ratios, deg=1)
+    trend_ratio = float(np.polyval(coef, float(puzzle_num)))
+  else:
+    trend_ratio = ratios[-1]
+
+  # Blend trend with mean to avoid wild extrapolation
+  blended_ratio = 0.65 * trend_ratio + 0.35 * mean_ratio
+  blended_ratio = float(np.clip(blended_ratio, 0.0, 1.0))
+
+  # --- Span-aware mapping back to the key range ---
+  span = range_max - range_min
+  predicted_key = range_min + int(round(blended_ratio * span))
+
+  # --- Gentle regularization toward small integer offsets (common early puzzles) ---
+  # Use median offset from history as a stabilizer for low-bit puzzles.
+  median_delta = int(np.median(deltas)) if deltas else 0
+  offset_guess = range_min + median_delta
+  prediction = int(round(0.7 * predicted_key + 0.3 * offset_guess))
+
+  # Final safety clip
+  return max(range_min, min(range_max, prediction))
