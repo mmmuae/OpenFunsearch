@@ -28,6 +28,7 @@ DATA: 82 solved puzzle private keys with their public keys.
 
 import funsearch
 import math
+from functools import lru_cache
 
 # =============================================================================
 # SECP256K1 CONSTANTS
@@ -209,17 +210,12 @@ def _build_transformed_data():
   return transformed
 
 
-try:
-  TRANSFORMED_DATA
-except NameError:
-  TRANSFORMED_DATA = None
-
-
+@lru_cache(maxsize=1)
 def _get_transformed_data():
-  global TRANSFORMED_DATA
-  if TRANSFORMED_DATA is None:
-    TRANSFORMED_DATA = _build_transformed_data()
-  return TRANSFORMED_DATA
+  # Using a cached function avoids reliance on module-level mutable state, which
+  # may be stripped by the funsearch sandbox. The data are small, so memoizing
+  # them is safe and cheap.
+  return _build_transformed_data()
 
 
 # =============================================================================
