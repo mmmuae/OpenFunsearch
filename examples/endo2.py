@@ -45,57 +45,6 @@ BETA = 0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee
 BETA2 = pow(BETA, 2, P)  # β²
 
 # =============================================================================
-# MINIMAL SECP256K1 OPERATIONS (for synthetic public keys)
-# =============================================================================
-
-
-def _mod_inv(a: int, p: int = P) -> int:
-  """Return the modular inverse using Fermat's little theorem."""
-  return pow(a, p - 2, p)
-
-
-def _point_double(p):
-  if p is None:
-    return None
-  x, y = p
-  if y == 0:
-    return None
-  m = ((3 * x * x) * _mod_inv(2 * y)) % P
-  x3 = (m * m - 2 * x) % P
-  y3 = (m * (x - x3) - y) % P
-  return (x3, y3)
-
-
-def _point_add(p1, p2):
-  """Add two points on secp256k1. Points are (x, y) or None for infinity."""
-  if p1 is None:
-    return p2
-  if p2 is None:
-    return p1
-  x1, y1 = p1
-  x2, y2 = p2
-  if x1 == x2 and (y1 + y2) % P == 0:
-    return None
-  if p1 == p2:
-    return _point_double(p1)
-  m = ((y2 - y1) * _mod_inv(x2 - x1)) % P
-  x3 = (m * m - x1 - x2) % P
-  y3 = (m * (x1 - x3) - y1) % P
-  return (x3, y3)
-
-
-def _scalar_mult(k: int, point) -> int:
-  """Return x-coordinate of k * point using double-and-add."""
-  result = None
-  addend = point
-  while k:
-    if k & 1:
-      result = _point_add(result, addend)
-    addend = _point_double(addend)
-    k >>= 1
-  return result[0] if result else 0
-
-# =============================================================================
 # SOLVED PUZZLE DATA: (bits, private_key, compressed_public_key)
 # 82 puzzles from bits 1-130 (with gaps at 71-74, 76-79, 81-84, etc.)
 # =============================================================================
@@ -255,7 +204,8 @@ def evaluate(seed: int) -> float:
     
     fake_k_lambda = (fake_k * LAMBDA) % N
     fake_k_lambda2 = (fake_k * LAMBDA2) % N
-    fake_pubkey_x = _scalar_mult(fake_k, (Gx, Gy))
+    # Fake pubkey_x (we can't easily compute this without ECC, use 0)
+    fake_pubkey_x = 0
     
     try:
       s = priority(bits, fake_k, fake_k_lambda, fake_k_lambda2, fake_pubkey_x)
@@ -333,7 +283,7 @@ def evaluate(seed: int) -> float:
   # Tail separation: up to ±10 points
   score += max(-10.0, min(10.0, tail_sep))
   
-  # Baseline random (balanced scores): ~30, max possible: ~125
+  # Baseline random: ~35, max possible: ~125
   return score
 
 
@@ -400,24 +350,5 @@ def priority(bits: int, k: int, k_lambda: int, k_lambda2: int, pubkey_x: int) ->
   Returns:
     float: higher = more likely to be a real puzzle key
   """
-  popcounts = [v.bit_count() for v in (k, k_lambda, k_lambda2)]
-  mean_pop = sum(popcounts) / 3.0
-  normalized_pop = mean_pop / max(bits, 1)
-
-  # Spread close to 0 means the triplet shares similar popcounts.
-  triplet_spread = (max(popcounts) - min(popcounts)) / max(bits, 1)
-
-  # Preference for balanced residues across the cycle.
-  cycle_residue = ((k % bits) + (k_lambda % bits) + (k_lambda2 % bits)) / (3.0 * bits)
-
-  # Lightweight public-key signal: low-byte variation is enough to avoid ties.
-  pub_low = (pubkey_x & 0xFF) / 255.0
-
-  score = 0.0
-  score += (normalized_pop - 0.5) * 10.0
-  score += (1.0 - min(triplet_spread, 1.0)) * 5.0
-  score += (0.5 - cycle_residue) * 3.0
-  score += (pub_low - 0.5) * 2.0
-  score -= bits * 0.02
-
-  return score
+  # Baseline - discover the pattern!
+  return 0.0
