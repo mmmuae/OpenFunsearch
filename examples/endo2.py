@@ -190,20 +190,36 @@ SOLVED_KEYS = [
 # For each key k, compute the triplet (k, k*λ mod N, k*λ² mod N)
 # =============================================================================
 
-TRANSFORMED_DATA = []
-for bits, k, pubkey in SOLVED_KEYS:
-  k_lambda = (k * LAMBDA) % N
-  k_lambda2 = (k * LAMBDA2) % N
-  # Also extract pubkey x-coordinate for potential analysis
-  pubkey_x = int(pubkey[2:], 16)  # Skip the 02/03 prefix
-  TRANSFORMED_DATA.append({
-    'bits': bits,
-    'k': k,
-    'k_lambda': k_lambda,
-    'k_lambda2': k_lambda2,
-    'pubkey_x': pubkey_x,
-    'pubkey_prefix': pubkey[:2],  # 02 or 03 (y parity)
-  })
+
+def _build_transformed_data():
+  transformed = []
+  for bits, k, pubkey in SOLVED_KEYS:
+    k_lambda = (k * LAMBDA) % N
+    k_lambda2 = (k * LAMBDA2) % N
+    # Also extract pubkey x-coordinate for potential analysis
+    pubkey_x = int(pubkey[2:], 16)  # Skip the 02/03 prefix
+    transformed.append({
+      'bits': bits,
+      'k': k,
+      'k_lambda': k_lambda,
+      'k_lambda2': k_lambda2,
+      'pubkey_x': pubkey_x,
+      'pubkey_prefix': pubkey[:2],  # 02 or 03 (y parity)
+    })
+  return transformed
+
+
+try:
+  TRANSFORMED_DATA
+except NameError:
+  TRANSFORMED_DATA = None
+
+
+def _get_transformed_data():
+  global TRANSFORMED_DATA
+  if TRANSFORMED_DATA is None:
+    TRANSFORMED_DATA = _build_transformed_data()
+  return TRANSFORMED_DATA
 
 
 # =============================================================================
@@ -223,10 +239,12 @@ def evaluate(seed: int) -> float:
   """
   import random
   rng = random.Random(seed)
-  
+
+  transformed_data = _get_transformed_data()
+
   # Score real puzzle keys
   real_scores = []
-  for data in TRANSFORMED_DATA:
+  for data in transformed_data:
     try:
       s = priority(
         data['bits'],
@@ -245,7 +263,7 @@ def evaluate(seed: int) -> float:
   
   # Generate fake keys (random in same bit ranges) and score them
   fake_scores = []
-  for data in TRANSFORMED_DATA:
+  for data in transformed_data:
     bits = data['bits']
     # Random key in same bit range [2^(bits-1), 2^bits - 1]
     if bits == 1:
