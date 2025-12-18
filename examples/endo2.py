@@ -28,6 +28,7 @@ DATA: 82 solved puzzle private keys with their public keys.
 
 import funsearch
 import math
+from functools import lru_cache
 
 # =============================================================================
 # SECP256K1 CONSTANTS
@@ -43,6 +44,57 @@ LAMBDA = 0x5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72
 LAMBDA2 = pow(LAMBDA, 2, N)  # λ²
 BETA = 0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee
 BETA2 = pow(BETA, 2, P)  # β²
+
+# =============================================================================
+# MINIMAL SECP256K1 OPERATIONS (for synthetic public keys)
+# =============================================================================
+
+
+def _mod_inv(a: int, p: int = P) -> int:
+  """Return the modular inverse using Fermat's little theorem."""
+  return pow(a, p - 2, p)
+
+
+def _point_double(p):
+  if p is None:
+    return None
+  x, y = p
+  if y == 0:
+    return None
+  m = ((3 * x * x) * _mod_inv(2 * y)) % P
+  x3 = (m * m - 2 * x) % P
+  y3 = (m * (x - x3) - y) % P
+  return (x3, y3)
+
+
+def _point_add(p1, p2):
+  """Add two points on secp256k1. Points are (x, y) or None for infinity."""
+  if p1 is None:
+    return p2
+  if p2 is None:
+    return p1
+  x1, y1 = p1
+  x2, y2 = p2
+  if x1 == x2 and (y1 + y2) % P == 0:
+    return None
+  if p1 == p2:
+    return _point_double(p1)
+  m = ((y2 - y1) * _mod_inv(x2 - x1)) % P
+  x3 = (m * m - x1 - x2) % P
+  y3 = (m * (x1 - x3) - y1) % P
+  return (x3, y3)
+
+
+def _scalar_mult(k: int, point) -> int:
+  """Return x-coordinate of k * point using double-and-add."""
+  result = None
+  addend = point
+  while k:
+    if k & 1:
+      result = _point_add(result, addend)
+    addend = _point_double(addend)
+    k >>= 1
+  return result[0] if result else 0
 
 # =============================================================================
 # SOLVED PUZZLE DATA: (bits, private_key, compressed_public_key)
@@ -139,20 +191,31 @@ SOLVED_KEYS = [
 # For each key k, compute the triplet (k, k*λ mod N, k*λ² mod N)
 # =============================================================================
 
-TRANSFORMED_DATA = []
-for bits, k, pubkey in SOLVED_KEYS:
-  k_lambda = (k * LAMBDA) % N
-  k_lambda2 = (k * LAMBDA2) % N
-  # Also extract pubkey x-coordinate for potential analysis
-  pubkey_x = int(pubkey[2:], 16)  # Skip the 02/03 prefix
-  TRANSFORMED_DATA.append({
-    'bits': bits,
-    'k': k,
-    'k_lambda': k_lambda,
-    'k_lambda2': k_lambda2,
-    'pubkey_x': pubkey_x,
-    'pubkey_prefix': pubkey[:2],  # 02 or 03 (y parity)
-  })
+
+def _build_transformed_data():
+  transformed = []
+  for bits, k, pubkey in SOLVED_KEYS:
+    k_lambda = (k * LAMBDA) % N
+    k_lambda2 = (k * LAMBDA2) % N
+    # Also extract pubkey x-coordinate for potential analysis
+    pubkey_x = int(pubkey[2:], 16)  # Skip the 02/03 prefix
+    transformed.append({
+      'bits': bits,
+      'k': k,
+      'k_lambda': k_lambda,
+      'k_lambda2': k_lambda2,
+      'pubkey_x': pubkey_x,
+      'pubkey_prefix': pubkey[:2],  # 02 or 03 (y parity)
+    })
+  return transformed
+
+
+@lru_cache(maxsize=1)
+def _get_transformed_data():
+  # Using a cached function avoids reliance on module-level mutable state, which
+  # may be stripped by the funsearch sandbox. The data are small, so memoizing
+  # them is safe and cheap.
+  return _build_transformed_data()
 
 
 # =============================================================================
@@ -172,10 +235,12 @@ def evaluate(seed: int) -> float:
   """
   import random
   rng = random.Random(seed)
-  
+
+  transformed_data = _get_transformed_data()
+
   # Score real puzzle keys
   real_scores = []
-  for data in TRANSFORMED_DATA:
+  for data in transformed_data:
     try:
       s = priority(
         data['bits'],
@@ -194,7 +259,7 @@ def evaluate(seed: int) -> float:
   
   # Generate fake keys (random in same bit ranges) and score them
   fake_scores = []
-  for data in TRANSFORMED_DATA:
+  for data in transformed_data:
     bits = data['bits']
     # Random key in same bit range [2^(bits-1), 2^bits - 1]
     if bits == 1:
@@ -204,8 +269,7 @@ def evaluate(seed: int) -> float:
     
     fake_k_lambda = (fake_k * LAMBDA) % N
     fake_k_lambda2 = (fake_k * LAMBDA2) % N
-    # Fake pubkey_x (we can't easily compute this without ECC, use 0)
-    fake_pubkey_x = 0
+    fake_pubkey_x = _scalar_mult(fake_k, (Gx, Gy))
     
     try:
       s = priority(bits, fake_k, fake_k_lambda, fake_k_lambda2, fake_pubkey_x)
@@ -283,7 +347,7 @@ def evaluate(seed: int) -> float:
   # Tail separation: up to ±10 points
   score += max(-10.0, min(10.0, tail_sep))
   
-  # Baseline random: ~35, max possible: ~125
+  # Baseline random (balanced scores): ~30, max possible: ~125
   return score
 
 
@@ -350,5 +414,24 @@ def priority(bits: int, k: int, k_lambda: int, k_lambda2: int, pubkey_x: int) ->
   Returns:
     float: higher = more likely to be a real puzzle key
   """
-  # Baseline - discover the pattern!
-  return 0.0
+  popcounts = [v.bit_count() for v in (k, k_lambda, k_lambda2)]
+  mean_pop = sum(popcounts) / 3.0
+  normalized_pop = mean_pop / max(bits, 1)
+
+  # Spread close to 0 means the triplet shares similar popcounts.
+  triplet_spread = (max(popcounts) - min(popcounts)) / max(bits, 1)
+
+  # Preference for balanced residues across the cycle.
+  cycle_residue = ((k % bits) + (k_lambda % bits) + (k_lambda2 % bits)) / (3.0 * bits)
+
+  # Lightweight public-key signal: low-byte variation is enough to avoid ties.
+  pub_low = (pubkey_x & 0xFF) / 255.0
+
+  score = 0.0
+  score += (normalized_pop - 0.5) * 10.0
+  score += (1.0 - min(triplet_spread, 1.0)) * 5.0
+  score += (0.5 - cycle_residue) * 3.0
+  score += (pub_low - 0.5) * 2.0
+  score -= bits * 0.02
+
+  return score
