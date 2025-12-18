@@ -175,7 +175,6 @@ HIGH_RANK = [
 @funsearch.run  
 def evaluate(seed: int) -> float:
   """Robust evaluation using rank-based scoring with caps."""
-  
   low_scores = []
   high_scores = []
   
@@ -250,11 +249,6 @@ def evaluate(seed: int) -> float:
   return score
 
 
-# =============================================================================
-# THE FUNCTION TO EVOLVE
-# =============================================================================
-
-@funsearch.evolve
 def priority(k: int, start: int, chunk_bits: int) -> float:
   """Score a chunk. Higher = more likely to produce low gap (near-collision).
 
@@ -300,5 +294,118 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
   Returns:
     float: higher = chunk more likely to produce low gap
   """
-  # Empty baseline - discover the pattern!
-  return 0.0
+  """
+  Enhanced scoring function to predict low-gap chunks in Pollard's Kangaroo.
+  """
+  chunk_size = 2 ** chunk_bits
+  offset = abs(k - start)
+  offset_normalized = offset / chunk_size
+
+  # 1. Proximity to multiples of N (stronger signal)
+  n_mod_start = start % N
+  n_dist = min(n_mod_start, N - n_mod_start)
+  n_score = 1.0 - (n_dist / N)
+
+  # 2. Proximity to multiples of P
+  p_mod_start = start % P
+  p_dist = min(p_mod_start, P - p_mod_start)
+  p_score = 1.0 - (p_dist / P)
+
+  # 3. Smoothness (number of small prime factors)
+  small_primes = [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+
+  def smoothness(n):
+    factors = 0
+    for p in small_primes:
+      while n % p == 0:
+        factors += 1
+        n //= p
+    return factors
+
+  smooth_score = smoothness(start) / 14.0  # Normalize by number of primes
+
+  # 4. Bit pattern (fewer transitions = better)
+  bits = bin(start)[2:]
+  transitions = sum(1 for i in range(len(bits)-1) if bits[i] != bits[i+1])
+  bit_pattern_score = 1.0 / (1.0 + transitions / len(bits))
+
+  # 5. Alignment with pubkey (how close is start to a value that would align well with pubkey)
+  pubkey_mod_start = (PUBKEY_X - start) % N
+  pubkey_dist = min(pubkey_mod_start, N - pubkey_mod_start)
+  pubkey_score = 1.0 - (pubkey_dist / N)
+
+  # 6. Boundary proximity
+  range_dist = min(abs(start - RANGE_MIN), abs(start - RANGE_MAX))
+  boundary_score = 1.0 - (range_dist / (RANGE_MAX - RANGE_MIN))
+
+  # 7. Offset from k (where collision occurred)
+  center = start + chunk_size // 2
+  offset_from_center = abs(k - center)
+  center_score = 1.0 - (offset_from_center / (chunk_size // 2))
+
+  # 8. Entropy-based pattern (lower entropy = more predictable)
+  def entropy(n):
+    s = bin(n)[2:]
+    counts = {}
+    for c in s:
+      counts[c] = counts.get(c, 0) + 1
+    total = len(s)
+    ent = 0
+    for v in counts.values():
+      p = v / total
+      ent -= p * math.log2(p)
+    return ent / math.log2(total)  # Normalized entropy
+  entropy_score = 1.0 - entropy(start)
+
+  # 9. Quadratic Residue Properties (Legendre symbol)
+  def legendre(a, p):
+    return pow(a, (p - 1) // 2, p)
+
+  try:
+    # If 1, it's a QR; if -1, non-QR
+    qr_score = 1.0 - abs(legendre(start % P, P) - 1)
+  except:
+    qr_score = 0.0
+
+  # 10. Distance to N mod P (could hint at alignment with curve structure)
+  n_mod_p = start % P
+  n_mod_p_dist = min(n_mod_p, P - n_mod_p)
+  n_mod_p_score = 1.0 - (n_mod_p_dist / P)
+
+  # 11. Bit density (number of 1s vs 0s)
+  popcount = bin(start).count('1')
+  density = popcount / len(bin(start)[2:])
+  density_score = 1.0 - abs(density - 0.5)  # Closer to 0.5 = balanced
+
+  # 12. Periodicity (if start has repeated patterns)
+  hex_str = hex(start)[2:]
+  if len(hex_str) > 10:
+    # Look for repeating substrings in hex
+    max_repeats = 0
+    for i in range(1, len(hex_str) // 2 + 1):
+      substr = hex_str[:i]
+      count = hex_str.count(substr)
+      if count > 1:
+        max_repeats = max(max_repeats, count)
+    repeat_score = max_repeats / (len(hex_str) // 2)
+  else:
+    repeat_score = 0.0
+
+  # Combine all scores
+  final_score = (
+      3.0 * n_score +
+      2.0 * p_score +
+      1.5 * smooth_score +
+      1.0 * bit_pattern_score +
+      1.0 * pubkey_score +
+      0.5 * boundary_score +
+      1.0 * center_score +
+      0.5 * entropy_score +
+      0.5 * qr_score +
+      0.3 * n_mod_p_score +
+      0.4 * density_score +
+      0.2 * repeat_score
+  )
+
+  return final_score
+
