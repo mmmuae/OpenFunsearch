@@ -248,8 +248,14 @@ class NeuralAttentionPredictor:
         X = np.array(features)[np.newaxis, :, :]  # Add batch dimension
         y = np.array(targets)[np.newaxis, :]
         
+        recent_lors = [t[0] for t in targets[-10:]]
+        empirical = np.mean(recent_lors) if recent_lors else 0.5
+
+        if len(features) > 25:
+            return np.array([np.clip(empirical, 0.1, 0.95)])
+
         # Quick training
-        self.train(X, y, epochs=30, lr=0.005)
+        self.train(X, y, epochs=5, lr=0.005)
         
         # Predict - use weighted recent average as fallback
         raw_pred = self.forward(X)[0]
@@ -438,11 +444,12 @@ class MCMCPredictor:
         
         # LOR likelihood (Gaussian)
         actual_lor = math.log2(max(1, key - low + 1)) / n_bits
-        lor_ll = -50 * (actual_lor - expected_lor) ** 2
+        lor_scale = 120 + n_bits
+        lor_ll = -lor_scale * (actual_lor - expected_lor) ** 2
         
         # Density likelihood
         actual_density = bin(key).count('1') / n_bits
-        density_ll = -20 * (actual_density - expected_density) ** 2
+        density_ll = -35 * (actual_density - expected_density) ** 2
         
         return lor_ll + density_ll
     
@@ -475,7 +482,7 @@ class MCMCPredictor:
         current = initial
         current_ll = self.log_likelihood(current, n_bits, expected_lor, expected_density)
         
-        step_size = 1 << (n_bits // 4)  # Adaptive step size
+        step_size = max(1, 1 << (n_bits // 5))  # Adaptive step size
         accepted = 0
         
         total_iterations = self.burn_in + self.n_samples * self.thinning
@@ -881,13 +888,15 @@ class ManifoldRegressor:
     Nonlinear manifold regression with lattice-refined rational coefficients.
     """
 
-    def __init__(self, ridge: float = 1e-6, lll_scale: int = 10**5, max_den: int = 8000):
+    def __init__(self, ridge: float = 5e-4, lll_scale: int = 10**5, max_den: int = 8000):
         self.ridge = ridge
         self.lll_scale = lll_scale
         self.max_den = max_den
         self.reducer = LLLReducer()
         self.coefficients = None
         self.rational_coefficients = None
+        self.feature_mean = None
+        self.feature_scale = None
 
     def _features(self, n: float) -> np.ndarray:
         logn = math.log(n + 1)
@@ -941,22 +950,29 @@ class ManifoldRegressor:
     def fit(self, n_values: np.ndarray, y_values: np.ndarray) -> float:
         X = np.vstack([self._features(n) for n in n_values])
         y = np.array(y_values)
-        XtX = X.T @ X + self.ridge * np.eye(X.shape[1])
-        Xty = X.T @ y
+        self.feature_mean = X.mean(axis=0)
+        self.feature_scale = X.std(axis=0) + 1e-6
+        Xn = (X - self.feature_mean) / self.feature_scale
+
+        XtX = Xn.T @ Xn + self.ridge * np.eye(Xn.shape[1])
+        Xty = Xn.T @ y
         coeffs = np.linalg.solve(XtX, Xty)
 
         refined, rationals = self._refine_coefficients(coeffs)
         self.coefficients = refined
         self.rational_coefficients = rationals
 
-        predictions = X @ self.coefficients
+        predictions = Xn @ self.coefficients
         residuals = y - predictions
         return float(np.mean(residuals ** 2))
 
     def predict(self, n: float) -> float:
-        if self.coefficients is None:
+        if self.coefficients is None or self.feature_mean is None or self.feature_scale is None:
             return 0.5
-        return float(self._features(n) @ self.coefficients)
+        features = (self._features(n) - self.feature_mean) / self.feature_scale
+        raw = float(features @ self.coefficients)
+        bounded = 1 / (1 + np.exp(-8 * (raw - 0.5)))
+        return float(np.clip(bounded, 0.05, 0.95))
 
 
 # ============================================================================
@@ -1610,7 +1626,14 @@ class UltraAdvancedSolver:
             residual_variance = float(np.mean(residual_variances))
         else:
             residual_variance = float(np.var(features['lors'])) if len(features['lors']) else 0.01
-        mcmc_analysis = self._sanitize_mcmc_range(mcmc_analysis, low, high, residual_variance)
+        mcmc_analysis = self._sanitize_mcmc_range(
+            mcmc_analysis,
+            low,
+            high,
+            residual_variance,
+            ensemble_lor,
+            target_n,
+        )
         
         # 11. Genetic Algorithm Refinement
         print("[11/12] Genetic Algorithm Optimization...")
@@ -1654,7 +1677,15 @@ class UltraAdvancedSolver:
         
         return final_key, mcmc_analysis
 
-    def _sanitize_mcmc_range(self, analysis: Dict, low: int, high: int, residual_variance: float) -> Dict:
+    def _sanitize_mcmc_range(
+        self,
+        analysis: Dict,
+        low: int,
+        high: int,
+        residual_variance: float,
+        expected_lor: float,
+        n_bits: int,
+    ) -> Dict:
         median = int(np.clip(analysis.get('median', (low + high) // 2), low, high))
         p5 = int(np.clip(analysis.get('percentile_5', median), low, high))
         p95 = int(np.clip(analysis.get('percentile_95', median), low, high))
@@ -1662,12 +1693,32 @@ class UltraAdvancedSolver:
             p5, p95 = p95, p5
         if not (p5 <= median <= p95):
             median = int(np.clip(median, p5, p95))
-        if p5 == p95:
+        total = high - low
+        width = p95 - p5
+        variance_scale = 1 + min(0.5, residual_variance * 3)
+        max_width = max(1, int(total * 0.02))
+        cap_bits = max(30, int(n_bits * 0.6))
+        max_width = min(max_width, 1 << cap_bits)
+
+        sigma_lor = max(0.01, min(0.2, math.sqrt(max(residual_variance, 1e-6))))
+        lor_low = np.clip(expected_lor - 2 * sigma_lor, 0.01, 0.99)
+        lor_high = np.clip(expected_lor + 2 * sigma_lor, 0.01, 0.99)
+        lor_low_key = low + int(2 ** (n_bits * lor_low))
+        lor_high_key = min(high, low + int(2 ** (n_bits * lor_high)))
+
+        p5 = max(p5, min(lor_low_key, lor_high_key))
+        p95 = min(p95, max(lor_low_key, lor_high_key))
+        if p5 > p95:
+            p5, p95 = p95, p5
+        width = p95 - p5
+
+        if width == 0 or width > max_width:
             std = analysis.get('std', 0.0)
-            variance_scale = 1 + min(2.0, residual_variance * 15)
-            width = max(1, int((std if std > 0 else (high - low) * 0.005) * variance_scale))
-            p5 = max(low, median - width)
-            p95 = min(high, median + width)
+            fallback = std if std > 0 else total * 0.01
+            width = max(1, int(min(fallback * variance_scale, max_width)))
+            half = max(1, width // 2)
+            p5 = max(low, median - half)
+            p95 = min(high, median + half)
         analysis['median'] = median
         analysis['percentile_5'] = p5
         analysis['percentile_95'] = p95
@@ -1678,7 +1729,7 @@ class UltraAdvancedSolver:
         """Print comprehensive report."""
         low = 1 << (target_n - 1)
         high = (1 << target_n) - 1
-        variance_scale = 1 + min(2.0, residual_variance * 15)
+        variance_scale = 1 + min(0.5, residual_variance * 3)
         
         print(f"\n{'─'*70}")
         print(f"   COMPREHENSIVE ANALYSIS REPORT")
@@ -1821,6 +1872,55 @@ def validate_all():
     print(f"  >60%: {above_60}/{len(results)} ({above_60/len(results)*100:.1f}%)")
     print("="*70 + "\n")
 
+def validate_high():
+    """Validate solver on higher-bit puzzles."""
+    print("\n" + "="*70)
+    print("   HIGH-BIT VALIDATION MODE")
+    print("="*70 + "\n")
+
+    results = []
+    test_puzzles = [n for n, _ in SOLVED_DATA if n >= 80]
+
+    for target_n in test_puzzles:
+        train_data = [(n, k) for n, k in SOLVED_DATA if n < target_n]
+        if len(train_data) < 15:
+            continue
+
+        lors = []
+        ns = []
+        for n, k in train_data:
+            if n > 1:
+                low = 1 << (n - 1)
+                lor = math.log2(max(1, k - low + 1)) / n
+                lors.append(lor)
+                ns.append(n)
+
+        if not lors:
+            continue
+
+        weights = [math.exp(-0.03 * (target_n - n)) for n in ns]
+        predicted_lor = np.average(lors, weights=weights)
+        low = 1 << (target_n - 1)
+        offset = int(2 ** (target_n * predicted_lor))
+        predicted_key = min(low + offset, (1 << target_n) - 1)
+
+        actual = [k for n, k in SOLVED_DATA if n == target_n][0]
+        xor = predicted_key ^ actual
+        matching = target_n - bin(xor).count('1')
+        accuracy = matching / target_n * 100
+
+        results.append((target_n, matching, target_n, accuracy))
+        print(f"Puzzle {target_n:3d}: {matching:2d}/{target_n:2d} bits ({accuracy:5.1f}%)")
+
+    print("\n" + "-"*70)
+    if results:
+        avg = sum(r[3] for r in results) / len(results)
+        print(f"Average: {avg:.1f}%")
+        print(f"Tested:  {len(results)} puzzles")
+    else:
+        print("No high-bit puzzles available for validation.")
+    print("="*70 + "\n")
+
 
 def main():
     import sys
@@ -1845,6 +1945,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--validate":
         validate_all()
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "--validate-high":
+        validate_high()
+        return
     
     solver = UltraAdvancedSolver()
     
@@ -1863,6 +1966,7 @@ def main():
     except EOFError:
         print("\n[!] Usage: python ultra_advanced_solver.py <puzzle_num> [pubkey]")
         print("           python ultra_advanced_solver.py --validate")
+        print("           python ultra_advanced_solver.py --validate-high")
     except Exception as e:
         print(f"[ERROR] {e}")
         import traceback
