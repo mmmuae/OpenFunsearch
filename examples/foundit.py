@@ -12,6 +12,10 @@ ADVANCED TECHNIQUES:
 - Mutual Information & Dependency Analysis
 - Wasserstein Distance Optimization
 - Variational Bayesian Inference
+- LLL Lattice Reduction with Rational Coefficient Refinement
+- Manifold Regression with Lattice-Refined Coefficients
+- Robust Weighted Polynomial Fitting
+- Kernel Regression Ensemble for LOR Prediction
 - ECDLP-Specific: Baby-Step Giant-Step Optimization
 - Lattice Enumeration (Schnorr-Euchner style)
 - Belief Propagation on Factor Graphs
@@ -25,6 +29,7 @@ from typing import Tuple, List, Dict, Optional, Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from collections import defaultdict
+from fractions import Fraction
 import random
 import warnings
 warnings.filterwarnings('ignore')
@@ -811,6 +816,150 @@ class BeliefPropagation:
 
 
 # ============================================================================
+# LLL LATTICE REDUCTION UTILITIES
+# ============================================================================
+
+class LLLReducer:
+    """
+    Lenstra–Lenstra–Lovász lattice reduction for integer bases.
+    Provides a foundation for rational coefficient refinement.
+    """
+
+    def __init__(self, delta: float = 0.75):
+        self.delta = delta
+
+    def _gram_schmidt(self, basis: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+        n = len(basis)
+        dim = len(basis[0])
+        ortho = np.zeros((n, dim), dtype=float)
+        mu = np.zeros((n, n), dtype=float)
+        norms = np.zeros(n, dtype=float)
+
+        for i in range(n):
+            ortho[i] = basis[i].astype(float)
+            for j in range(i):
+                denom = np.dot(ortho[j], ortho[j]) + 1e-12
+                mu[i, j] = np.dot(basis[i], ortho[j]) / denom
+                ortho[i] -= mu[i, j] * ortho[j]
+            norms[i] = np.dot(ortho[i], ortho[i])
+
+        return mu, norms
+
+    def reduce(self, basis: List[List[int]]) -> List[List[int]]:
+        """Return LLL-reduced basis."""
+        B = [np.array(vec, dtype=np.int64) for vec in basis]
+        n = len(B)
+        if n <= 1:
+            return [vec.tolist() for vec in B]
+
+        mu, norms = self._gram_schmidt(B)
+        k = 1
+
+        while k < n:
+            for j in range(k - 1, -1, -1):
+                q = int(round(mu[k, j]))
+                if q != 0:
+                    B[k] = B[k] - q * B[j]
+            mu, norms = self._gram_schmidt(B)
+
+            if norms[k] >= (self.delta - mu[k, k - 1] ** 2) * norms[k - 1]:
+                k += 1
+            else:
+                B[k], B[k - 1] = B[k - 1], B[k]
+                mu, norms = self._gram_schmidt(B)
+                k = max(k - 1, 1)
+
+        return [vec.tolist() for vec in B]
+
+
+# ============================================================================
+# MANIFOLD REGRESSION WITH RATIONAL REFINEMENT
+# ============================================================================
+
+class ManifoldRegressor:
+    """
+    Nonlinear manifold regression with lattice-refined rational coefficients.
+    """
+
+    def __init__(self, ridge: float = 1e-6, lll_scale: int = 10**5, max_den: int = 8000):
+        self.ridge = ridge
+        self.lll_scale = lll_scale
+        self.max_den = max_den
+        self.reducer = LLLReducer()
+        self.coefficients = None
+        self.rational_coefficients = None
+
+    def _features(self, n: float) -> np.ndarray:
+        logn = math.log(n + 1)
+        return np.array([
+            1.0,
+            logn,
+            n,
+            math.sqrt(n),
+            n * logn,
+            logn ** 2,
+        ])
+
+    def _refine_coefficients(self, coeffs: np.ndarray) -> Tuple[np.ndarray, List[Fraction]]:
+        dim = len(coeffs)
+        if dim == 0:
+            return coeffs, []
+
+        scale = self.lll_scale
+        basis = []
+        for i, coef in enumerate(coeffs):
+            row = [0] * (dim + 1)
+            row[i] = scale
+            row[-1] = int(round(scale * coef))
+            basis.append(row)
+        basis.append([0] * dim + [1])
+
+        reduced = self.reducer.reduce(basis)
+        best = None
+
+        for vec in reduced:
+            denom = vec[-1]
+            if denom == 0:
+                continue
+            if abs(denom) > self.max_den:
+                continue
+            approx = np.array(vec[:-1], dtype=float) / denom
+            error = np.mean((approx - coeffs) ** 2)
+            if best is None or error < best[0]:
+                best = (error, approx, denom)
+
+        if best is None:
+            refined = coeffs.copy()
+            rationals = [Fraction(c).limit_denominator(self.max_den) for c in refined]
+            return refined, rationals
+
+        refined = best[1]
+        denom = best[2]
+        rationals = [Fraction(int(round(val * denom)), denom).limit_denominator(self.max_den) for val in refined]
+        return refined, rationals
+
+    def fit(self, n_values: np.ndarray, y_values: np.ndarray) -> float:
+        X = np.vstack([self._features(n) for n in n_values])
+        y = np.array(y_values)
+        XtX = X.T @ X + self.ridge * np.eye(X.shape[1])
+        Xty = X.T @ y
+        coeffs = np.linalg.solve(XtX, Xty)
+
+        refined, rationals = self._refine_coefficients(coeffs)
+        self.coefficients = refined
+        self.rational_coefficients = rationals
+
+        predictions = X @ self.coefficients
+        residuals = y - predictions
+        return float(np.mean(residuals ** 2))
+
+    def predict(self, n: float) -> float:
+        if self.coefficients is None:
+            return 0.5
+        return float(self._features(n) @ self.coefficients)
+
+
+# ============================================================================
 # LATTICE ENUMERATION (Schnorr-Euchner Style)
 # ============================================================================
 
@@ -883,6 +1032,97 @@ class LatticeEnumerator:
         enumerate(n - 1, partial, 0)
         
         return short_vectors
+
+
+# ============================================================================
+# ROBUST POLYNOMIAL & KERNEL REGRESSION
+# ============================================================================
+
+class RobustPolynomialFitter:
+    """
+    Weighted polynomial fitting with robust (Huber) loss refinement.
+    """
+
+    def __init__(self, degree: int = 3, decay: float = 0.03, iterations: int = 6):
+        self.degree = degree
+        self.decay = decay
+        self.iterations = iterations
+
+    def fit(self, x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
+        x = np.array(x, dtype=float)
+        y = np.array(y, dtype=float)
+        if len(x) == 0:
+            return np.zeros(self.degree + 1), 0.0
+        if len(x) == 1:
+            return np.array([y[0]]), 0.0
+
+        age = x.max() - x
+        base_weights = np.exp(-self.decay * age)
+        weights = base_weights.copy()
+        degree = min(self.degree, max(1, len(x) - 1))
+        coeffs = np.polyfit(x, y, degree, w=weights)
+
+        for _ in range(self.iterations):
+            preds = np.polyval(coeffs, x)
+            residuals = y - preds
+            scale = 1.4826 * np.median(np.abs(residuals)) + 1e-6
+            cutoff = 1.345 * scale
+            huber = np.where(np.abs(residuals) <= cutoff, 1.0, cutoff / (np.abs(residuals) + 1e-12))
+            weights = base_weights * huber
+            coeffs = np.polyfit(x, y, degree, w=weights)
+
+        residuals = y - np.polyval(coeffs, x)
+        return coeffs, float(np.mean(residuals ** 2))
+
+    def predict(self, coeffs: np.ndarray, x: float) -> float:
+        return float(np.polyval(coeffs, x))
+
+
+class KernelRegressor:
+    """
+    Nadaraya-Watson kernel regression with adaptive bandwidth.
+    """
+
+    def __init__(self, bandwidth: Optional[float] = None):
+        self.bandwidth = bandwidth
+        self.x = None
+        self.y = None
+
+    def fit(self, x: np.ndarray, y: np.ndarray):
+        self.x = np.array(x, dtype=float)
+        self.y = np.array(y, dtype=float)
+        if len(self.x) == 0:
+            self.bandwidth = 1.0
+            return
+        if self.bandwidth is None:
+            spread = np.median(np.abs(self.x - np.median(self.x)))
+            self.bandwidth = max(1.0, spread if spread > 0 else np.std(self.x) + 1e-6)
+
+    def _weights(self, x0: float) -> np.ndarray:
+        diffs = (x0 - self.x) / self.bandwidth
+        return np.exp(-0.5 * diffs ** 2)
+
+    def predict(self, x0: float) -> float:
+        if self.x is None or len(self.x) == 0:
+            return 0.5
+        weights = self._weights(x0)
+        total = weights.sum()
+        if total <= 1e-12:
+            return float(np.mean(self.y))
+        return float(np.dot(weights, self.y) / total)
+
+    def residual_variance(self) -> float:
+        if self.x is None or len(self.x) == 0:
+            return 0.0
+        residuals = []
+        for i in range(len(self.x)):
+            weights = self._weights(self.x[i])
+            weights[i] = 0.0
+            total = weights.sum()
+            pred = np.mean(self.y) if total <= 1e-12 else float(np.dot(weights, self.y) / total)
+            residuals.append(self.y[i] - pred)
+        residuals = np.array(residuals)
+        return float(np.mean(residuals ** 2))
 
 
 # ============================================================================
@@ -1169,6 +1409,9 @@ class UltraAdvancedSolver:
         self.vb = VariationalBayes(n_components=3)
         self.kde = AdaptiveKDE()
         self.symbolic = SymbolicRegressor(pop_size=50, max_depth=3)
+        self.manifold = ManifoldRegressor()
+        self.poly = RobustPolynomialFitter(degree=3)
+        self.kernel = KernelRegressor()
     
     def compute_base_features(self, target_n: int) -> Dict:
         """Compute base features from training data."""
@@ -1204,9 +1447,45 @@ class UltraAdvancedSolver:
         
         features = self.compute_base_features(target_n)
         predictions = {}
+        residual_variances = []
         
-        # 1. Neural Network with Attention
-        print("[1/10] Neural Attention Network...")
+        # 1. Manifold Regression with LLL refinement
+        print("[1/12] Manifold Regression (LLL-Refined)...")
+        try:
+            if len(features['ns']) > 4:
+                manifold_var = self.manifold.fit(features['ns'], features['lors'])
+                manifold_lor = self.manifold.predict(target_n)
+                predictions['manifold'] = np.clip(manifold_lor, 0, 0.99)
+                residual_variances.append(manifold_var)
+                print(f"       Manifold LOR: {predictions['manifold']:.4f}")
+            else:
+                predictions['manifold'] = 0.5
+        except Exception as e:
+            predictions['manifold'] = 0.5
+            print(f"       [!] Manifold failed: {e}")
+
+        # 2. Robust Polynomial Fit + Kernel Regression
+        print("[2/12] Robust Polynomial + Kernel Ensemble...")
+        try:
+            poly_coeffs, poly_var = self.poly.fit(features['ns'], features['lors'])
+            poly_lor = self.poly.predict(poly_coeffs, target_n)
+            predictions['poly'] = np.clip(poly_lor, 0, 0.99)
+            residual_variances.append(poly_var)
+
+            self.kernel.fit(features['ns'], features['lors'])
+            kernel_lor = self.kernel.predict(target_n)
+            predictions['kernel'] = np.clip(kernel_lor, 0, 0.99)
+            residual_variances.append(self.kernel.residual_variance())
+
+            print(f"       Poly LOR:   {predictions['poly']:.4f}")
+            print(f"       Kernel LOR: {predictions['kernel']:.4f}")
+        except Exception as e:
+            predictions['poly'] = 0.5
+            predictions['kernel'] = 0.5
+            print(f"       [!] Poly/Kernel failed: {e}")
+        
+        # 3. Neural Network with Attention
+        print("[3/12] Neural Attention Network...")
         try:
             nn_pred = self.neural_net.predict_key_features(self.training_data, target_n)
             nn_lor = float(nn_pred[0]) if len(nn_pred) > 0 else 0.5
@@ -1216,8 +1495,8 @@ class UltraAdvancedSolver:
             predictions['neural'] = 0.5
             print(f"       [!] Neural failed: {e}")
         
-        # 2. Symbolic Regression
-        print("[2/10] Symbolic Regression (Genetic Programming)...")
+        # 4. Symbolic Regression
+        print("[4/12] Symbolic Regression (Genetic Programming)...")
         try:
             if len(features['ns']) > 5:
                 formula = self.symbolic.fit(features['ns'], features['lors'], n_generations=30)
@@ -1229,8 +1508,8 @@ class UltraAdvancedSolver:
         except:
             predictions['symbolic'] = 0.5
         
-        # 3. Variational Bayes
-        print("[3/10] Variational Bayesian Inference...")
+        # 5. Variational Bayes
+        print("[5/12] Variational Bayesian Inference...")
         try:
             vb_params = self.vb.fit(features['lors'])
             vb_lor = self.vb.predict(vb_params)
@@ -1239,8 +1518,8 @@ class UltraAdvancedSolver:
         except:
             predictions['variational'] = 0.5
         
-        # 4. Adaptive KDE
-        print("[4/10] Adaptive Kernel Density Estimation...")
+        # 6. Adaptive KDE
+        print("[6/12] Adaptive Kernel Density Estimation...")
         try:
             self.kde.fit(features['lors'])
             modes = self.kde.find_modes()
@@ -1249,8 +1528,8 @@ class UltraAdvancedSolver:
         except:
             predictions['kde'] = 0.5
         
-        # 5. Wasserstein Optimal Transport
-        print("[5/10] Wasserstein Optimal Transport...")
+        # 7. Wasserstein Optimal Transport
+        print("[7/12] Wasserstein Optimal Transport...")
         try:
             wass_key = WassersteinOptimizer.find_optimal_transport_prediction(
                 self.training_data, target_n
@@ -1261,8 +1540,8 @@ class UltraAdvancedSolver:
         except:
             predictions['wasserstein'] = 0.5
         
-        # 6. Mutual Information Analysis
-        print("[6/10] Mutual Information & Belief Propagation...")
+        # 8. Mutual Information Analysis
+        print("[8/12] Mutual Information & Belief Propagation...")
         try:
             mi_analyzer = MutualInformationAnalyzer()
             mi_matrix = mi_analyzer.build_dependency_matrix(features['keys'], target_n)
@@ -1278,29 +1557,39 @@ class UltraAdvancedSolver:
         except:
             predictions['belief_prop'] = 0.5
         
-        # 7. Ensemble LOR prediction
-        print("[7/10] Computing Ensemble Prediction...")
+        # 9. Ensemble LOR prediction
+        print("[9/12] Computing Ensemble Prediction...")
         weights = {
-            'neural': 0.15,
-            'symbolic': 0.20,
-            'variational': 0.15,
-            'kde': 0.15,
-            'wasserstein': 0.15,
-            'belief_prop': 0.10,
+            'manifold': 0.14,
+            'poly': 0.10,
+            'kernel': 0.10,
+            'neural': 0.10,
+            'symbolic': 0.12,
+            'variational': 0.10,
+            'kde': 0.08,
+            'wasserstein': 0.10,
+            'belief_prop': 0.08,
         }
         
         # Add classic methods
-        classic_lor = np.mean(features['lors'][-10:]) if len(features['lors']) >= 10 else np.mean(features['lors'])
+        if len(features['lors']) >= 10:
+            classic_lor = np.mean(features['lors'][-10:])
+        elif len(features['lors']):
+            classic_lor = np.mean(features['lors'])
+        else:
+            classic_lor = 0.5
         predictions['classic'] = classic_lor
-        weights['classic'] = 0.10
+        weights['classic'] = 0.08
         
         ensemble_lor = sum(weights[k] * predictions[k] for k in weights)
         print(f"       Ensemble LOR: {ensemble_lor:.4f}")
         
-        # 8. MCMC Sampling
-        print("[8/10] MCMC Metropolis-Hastings Sampling...")
+        # 10. MCMC Sampling
+        print("[10/12] MCMC Metropolis-Hastings Sampling...")
         low = 1 << (target_n - 1)
+        high = (1 << target_n) - 1
         initial_key = low + int(2 ** (target_n * ensemble_lor))
+        initial_key = max(low, min(high, initial_key))
         
         expected_density = np.mean(features['densities'])
         
@@ -1316,9 +1605,15 @@ class UltraAdvancedSolver:
                 'percentile_5': low,
                 'percentile_95': (1 << target_n) - 1
             }
+
+        if residual_variances:
+            residual_variance = float(np.mean(residual_variances))
+        else:
+            residual_variance = float(np.var(features['lors'])) if len(features['lors']) else 0.01
+        mcmc_analysis = self._sanitize_mcmc_range(mcmc_analysis, low, high, residual_variance)
         
-        # 9. Genetic Algorithm Refinement
-        print("[9/10] Genetic Algorithm Optimization...")
+        # 11. Genetic Algorithm Refinement
+        print("[11/12] Genetic Algorithm Optimization...")
         try:
             target_features = {
                 'n_bits': target_n,
@@ -1329,14 +1624,14 @@ class UltraAdvancedSolver:
             ga_key, ga_fitness = self.ga.evolve(
                 target_n, target_features,
                 mcmc_analysis['median'],
-                mcmc_analysis['percentile_95'] - mcmc_analysis['percentile_5']
+                max(1, mcmc_analysis['percentile_95'] - mcmc_analysis['percentile_5'])
             )
             print(f"       GA Best: {hex(ga_key)} (fitness: {ga_fitness:.4f})")
         except:
             ga_key = mcmc_analysis['median']
         
-        # 10. Final Blending
-        print("[10/10] Final Prediction Blending...")
+        # 12. Final Blending
+        print("[12/12] Final Prediction Blending...")
         
         # Weighted blend of all key predictions
         final_key = int(
@@ -1354,16 +1649,36 @@ class UltraAdvancedSolver:
         # Print results
         self._print_report(
             target_n, final_key, predictions, weights, 
-            mcmc_analysis, ga_key, confidence, pub_hex
+            mcmc_analysis, ga_key, confidence, pub_hex, residual_variance
         )
         
         return final_key, mcmc_analysis
-    
+
+    def _sanitize_mcmc_range(self, analysis: Dict, low: int, high: int, residual_variance: float) -> Dict:
+        median = int(np.clip(analysis.get('median', (low + high) // 2), low, high))
+        p5 = int(np.clip(analysis.get('percentile_5', median), low, high))
+        p95 = int(np.clip(analysis.get('percentile_95', median), low, high))
+        if p5 > p95:
+            p5, p95 = p95, p5
+        if not (p5 <= median <= p95):
+            median = int(np.clip(median, p5, p95))
+        if p5 == p95:
+            std = analysis.get('std', 0.0)
+            variance_scale = 1 + min(2.0, residual_variance * 15)
+            width = max(1, int((std if std > 0 else (high - low) * 0.005) * variance_scale))
+            p5 = max(low, median - width)
+            p95 = min(high, median + width)
+        analysis['median'] = median
+        analysis['percentile_5'] = p5
+        analysis['percentile_95'] = p95
+        return analysis
+
     def _print_report(self, target_n, final_key, predictions, weights,
-                      mcmc_analysis, ga_key, confidence, pub_hex):
+                      mcmc_analysis, ga_key, confidence, pub_hex, residual_variance):
         """Print comprehensive report."""
         low = 1 << (target_n - 1)
         high = (1 << target_n) - 1
+        variance_scale = 1 + min(2.0, residual_variance * 15)
         
         print(f"\n{'─'*70}")
         print(f"   COMPREHENSIVE ANALYSIS REPORT")
@@ -1405,8 +1720,10 @@ class UltraAdvancedSolver:
         print(f"{'─'*70}")
         
         # Tight range based on MCMC
-        tight_low = mcmc_analysis['percentile_5']
-        tight_high = mcmc_analysis['percentile_95']
+        tight_center = (mcmc_analysis['percentile_5'] + mcmc_analysis['percentile_95']) // 2
+        tight_half = int(max(1, (mcmc_analysis['percentile_95'] - mcmc_analysis['percentile_5']) / 2) * variance_scale)
+        tight_low = max(low, tight_center - tight_half)
+        tight_high = min(high, tight_center + tight_half)
         
         print(f"\n   TIGHT RANGE (MCMC 90% CI):")
         print(f"   Start: {hex(tight_low).upper()}")
@@ -1414,7 +1731,7 @@ class UltraAdvancedSolver:
         print(f"   Size:  2^{math.log2(max(1, tight_high - tight_low)):.1f}")
         
         # Centered range
-        spread = 1 << max(20, int(target_n * (1 - confidence) * 0.5))
+        spread = int((1 << max(20, int(target_n * (1 - confidence) * 0.5))) * variance_scale)
         center_low = max(low, final_key - spread)
         center_high = min(high, final_key + spread)
         
@@ -1513,6 +1830,8 @@ def main():
     print("="*70)
     print("   DeepMind-Level Techniques:")
     print("   • Neural Network with Multi-Head Self-Attention")
+    print("   • Manifold Regression with LLL-Refined Coefficients")
+    print("   • Robust Polynomial + Kernel Regression Ensemble")
     print("   • Genetic Algorithm with Adaptive Mutation")
     print("   • MCMC Metropolis-Hastings Sampling")
     print("   • Variational Bayesian Inference")
