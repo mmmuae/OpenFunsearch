@@ -1,38 +1,32 @@
-"""BTC Puzzle 135: Why Do Certain Chunks Produce Low Kangaroo Gaps?
+"""BTC Puzzle 135: Why Do Certain Chunks Produce Low cross herd DP's Gaps?
 
 On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
 
-THE MYSTERY:
+YOUR MISSION:
+Primary: Discover what makes LOW_RANK chunks produce near-collisions. Secondary : discover a pattern, it might help predict where the actual
+private key is located. Low-gap chunks could be "attracted" to the key.
+
+Background:
 When running Pollard's Kangaroo on puzzle 135, we scan different chunks
 of the keyspace. Some chunks produce extremely low gaps (tame and wild
 kangaroos nearly collide), while others produce huge gaps. The difference
-spans 26 orders of magnitude. This is NOT random.
-
-What property of of that chunk from the keyspace causes kangaroos to nearly collide within it?
-
-THE DATA:
-  - start: chunk starting position
-  - k_est: derived from the near-collision (where tame/wild got closest)
-  - chunk_bits: size of chunk being scanned (2^64, 2^130, etc.) helps you to know the end of the scan.
-  
-The cause is somewhere in the chunk, the region's relationship to the
-public key, the actual private key location, or curve dynamics, or something not yet discovered.
-
-PUZZLE 135 PARAMETERS:
+spans 26 orders of magnitude. This is NOT random. PUZZLE 135 PARAMETERS:
   Public Key: 02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16
   PUBKEY_X = 0x145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16
   Range: 0x4000000000000000000000000000000000 to 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF (It's known the key exists in this range and it's 135 bits)
   Curve Order N: 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
   Field Prime P: 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 
-DATA STRUCTURE:
+The cause is somewhere in the chunk, the region's relationship to the
+public key, the actual private key location, or curve dynamics, or something not yet discovered.
+
+THE DATA:
+  - start: chunk starting position
+  - k_est: derived from the near-collision (where tame/wild got closest)
+  - chunk_bits: size of chunk being scanned (2^64, 2^130, etc.) helps you to know the end of the scan.
   - LOW_RANK: chunks in bottom 15% of lgap WITHIN their chunk_bits group
   - HIGH_RANK: chunks in top 15% of lgap WITHIN their chunk_bits group
   - lgap Normalized by chunk size (apples-to-apples comparison)
-
-YOUR MISSION:
-Primary: Discover what makes LOW_RANK chunks produce near-collisions. Secondary : discover a pattern, it might help predict where the actual
-private key is located. Low-gap chunks could be "attracted" to the key.
 
 DIRECTIONS TO EXPLORE (non-exhaustive):
 - Modular arithmetic (mod small primes, mod curve order N, CRT)
@@ -169,7 +163,7 @@ HIGH_RANK = [
 
 
 # =============================================================================
-# ROBUST EVALUATION - DeepMind style
+# EVALUATION
 # =============================================================================
 
 @funsearch.run  
@@ -251,7 +245,7 @@ def evaluate(seed: int) -> float:
 
 
 # =============================================================================
-# THE FUNCTION TO EVOLVE
+# THE FUNCTION TO EVOLVE "Priority"
 # =============================================================================
 
 @funsearch.evolve
@@ -259,11 +253,10 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
   """Score a chunk. Higher = more likely to produce low gap (near-collision).
 
   Args:
-    k: The k_est value - WHERE the near-collision occurred within chunk.
-       This is a measurement/clue, not the cause. But it tells you where
+    k: The k_est value - WHERE the near-collision occurred within chunk. it tells you where
        tame and wild kangaroos got closest - could reveal patterns.
     start: The chunk start position - defines the region being scanned.
-       This is the PRIMARY input. What makes this region special?
+       This is the PRIMARY input. What makes this region on the curve special?
     chunk_bits: Size of chunk (56, 60, 64, 80, 125, or 130)
 
   Available constants:
@@ -274,7 +267,6 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
     Field Prime P: 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 
   EXPLORE FREELY - the answer could involve:
-    PRIMARY (chunk region):
     - Modular arithmetic (mod small primes, mod curve order N, CRT)
     - Bit patterns (popcount, runs, transitions, density, palindromes)
     - Hex patterns (nibble distributions, repeated sequences, symmetry)
@@ -288,17 +280,8 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
     - Topology (shape of the data, clustering, manifold structure)
     - Statistical patterns (distribution tails, outlier structure)
 
-    SECONDARY (k_est as clue):
-      - Offset of k within the chunk (k - start) - where did collision happen?
-      - Bit/hex patterns in k that might indicate structure
-      - Relationship between k and start
-    
-    SPECULATION:
-      - Could low-gap chunks be near the actual private key?
-      - If you find a pattern, it might help predict key location!
-
   Returns:
     float: higher = chunk more likely to produce low gap
   """
-  # Empty baseline - discover the pattern!
+  # priority_vX
   return 0.0
