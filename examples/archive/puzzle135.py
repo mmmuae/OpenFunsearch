@@ -5,7 +5,7 @@ OBJECTIVE: Find patterns that predict which chunks have "FIT" (small) gaps.
 Hypothesis: Chunks with FIT gaps may be closer to the actual private key.
 
 PUZZLE 135 INFO:
-  Range: 0x6000000000000000000000000000000000 - 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  Range: 0x4000000000000000000000000000000000 - 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
   Public key: 02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16
   Bit length: 135
 

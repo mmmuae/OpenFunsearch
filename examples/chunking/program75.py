@@ -294,9 +294,7 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
   Returns:
     float: higher = chunk more likely to produce low gap
   """
-  """
-  Enhanced scoring function to predict low-gap chunks in Pollard's Kangaroo.
-  """
+  """Improved version of `priority_v1`."""
   chunk_size = 2 ** chunk_bits
   offset = abs(k - start)
   offset_normalized = offset / chunk_size
@@ -391,6 +389,15 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
   else:
     repeat_score = 0.0
 
+  # 13. Enhanced Kangaroo Path Feature
+  # Measure how k_est aligns with the expected path of kangaroos
+  expected_path = (start + chunk_size // 2) % N
+  path_alignment = 1.0 - abs((k - expected_path) % N / N)
+
+  # 14. Curve Structure Alignment
+  # Check if start aligns with known curve properties
+  curve_alignment = 1.0 - abs((start % N) - (PUBKEY_X % N)) / N
+
   # Combine all scores
   final_score = (
       3.0 * n_score +
@@ -404,7 +411,9 @@ def priority(k: int, start: int, chunk_bits: int) -> float:
       0.5 * qr_score +
       0.3 * n_mod_p_score +
       0.4 * density_score +
-      0.2 * repeat_score
+      0.2 * repeat_score +
+      0.3 * path_alignment +
+      0.2 * curve_alignment
   )
 
   return final_score

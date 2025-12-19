@@ -1,4 +1,5 @@
 """Endomorphism Pattern Discovery for Bitcoin Puzzles
+On every iteration, improve priority_v1 over the priority_vX methods from previous iterations.
 
 BACKGROUND:
 secp256k1 has a special efficiently-computable endomorphism where:
@@ -46,7 +47,7 @@ BETA2 = pow(BETA, 2, P)  # β²
 
 # =============================================================================
 # SOLVED PUZZLE DATA: (bits, private_key, compressed_public_key)
-# 82 puzzles from bits 1-130 (with gaps at 71-74, 76-79, 81-84, etc.)
+# 82 puzzles from bits 1-130 
 # =============================================================================
 
 SOLVED_KEYS = [
@@ -305,47 +306,6 @@ def priority(bits: int, k: int, k_lambda: int, k_lambda2: int, pubkey_x: int) ->
     k_lambda: k * λ mod N (first endomorphism transform)
     k_lambda2: k * λ² mod N (second endomorphism transform)
     pubkey_x: The x-coordinate of the public key (for reference)
-  
-  Key insight: λ³ ≡ 1 (mod N), so the three values form a cycle.
-  
-  Available constants:
-    N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-    P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
-    LAMBDA = 0x5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72
-    BETA = 0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee
-    Gx, Gy (generator point)
-  
-  EXPLORATION DIRECTIONS:
-  
-  1. TRIPLET RELATIONSHIPS:
-     - min(k, k_lambda, k_lambda2) - smallest representation
-     - Distances between the three values
-     - XOR / AND / OR patterns across the triplet
-     - GCD(k, k_lambda), GCD(k, k_lambda2), GCD(k_lambda, k_lambda2)
-     
-  2. MODULAR PATTERNS:
-     - k mod small_primes (3, 7, 11, 13, ...)
-     - Patterns that persist across all three representations
-     - Quadratic residues, Legendre symbols
-     
-  3. BIT PATTERNS:
-     - Popcount (number of 1 bits) in k, k_lambda, k_lambda2
-     - Bit runs, transitions, palindromes
-     - Common bits across all three representations
-     - Leading/trailing zeros
-     
-  4. ALGEBRAIC STRUCTURE:
-     - Relationship to N (curve order)
-     - Smoothness (size of largest prime factor)
-     - Continued fraction expansion
-     
-  5. CROSS-PUZZLE PATTERNS:
-     - How does the pattern change with puzzle number (bits)?
-     - Relationships between consecutive puzzle keys
-     
-  6. PUBLIC KEY RELATIONSHIPS:
-     - pubkey_x relation to k, k_lambda, k_lambda2
-     - pubkey_x mod small values
   
   Returns:
     float: higher = more likely to be a real puzzle key
